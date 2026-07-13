@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+damodel Combo_Options {
+  id     model Basket_Table {
+  id             String    @id @default(cuid())
+  Basket_ID      String    @unique @map("Basket ID")
+  User_Grubsy_ID String    @map("User Grubsy ID")
+  Merchant_ID    String    @map("Restaurant ID")
+  Menu_Item_ID   String    @map("Menu Item ID")
+  Quantity       String?
+  Price          String?
+  Added_At       String?   @map("Added At")
+  Status         String?
+  menuItem       Menu_Items @relation(fields: [Menu_Item_ID], references: [Menu_Item_ID])
+  merchant       Merchants  @relation(fields: [Merchant_ID], references: [Grubsy_Partner_ID])
+  user           Users      @relation(fields: [User_Grubsy_ID], references: [Grubsy_User_ID])
+
+  @@index([Menu_Item_ID], map: "Basket Table_Menu Item ID_fkey")
+  @@index([Merchant_ID], map: "Basket Table_Restaurant ID_fkey")
+  @@index([User_Grubsy_ID], map: "Basket Table_User Grubsy ID_fkey")
+  @@map("Basket Table")
+}  @id @default(cuid())
+  Establishment     String?
+  Combo_Name        String?   @map("Combo Name")
+  Option_Name       String?   @map("Option Name")
+  Option_Order      String?   @map("Option Order")
+  Option_Items      String?   @map("Option Items (comma separated)")
+  Combo_Option_ID   String    @unique @map("Combo Option ID")
+  Combo_ID          String?   @map("Combo ID")
+  Grubsy_Partner_ID String    @map("Grubsy Partner ID")
+  Image             String?
+  merchant          Merchants @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+
+  @@index([Grubsy_Partner_ID], map: "Combo Options_Grubsy Partner ID_fkey")
+  @@map("Combo Options")
+}provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  id                        String           @id @default(cuid())
+  Users_Full_Name           String?          @map("Users Full Name")
+  Users_Email               String           @unique @map("Users Email")
+  Users_Password            String?          @map("Users Password")
+  Grubsy_User_ID            String           @unique @map("Grubsy User ID")
+  Is_New_User               String?          @map("Is New User?")
+  Users_Registered_Address  String?          @map("Users Registered Address")
+  Users_Registered_PostCode String?          @map("Users Registered PostCode")
+  Users_Phone_Number        String?          @map("Users Phone Number")
+  Date_Of_Birth             String?          @map("Date Of Birth")
+  Status                    String?
+  Created_At                String?          @map("Created At")
+  Last_Login                String?          @map("Last Login")
+  basketItems               Basket_Table[]
+  orderMessages             Order_Messages[]
+  orders                    Orders[]
+
+  @@map("Users")
+}
+
+model Menu_Items {
+  id                String         @id @default(cuid())
+  Menu_Item_ID      String         @unique @map("Menu Item ID")
+  Establishments    String?        @map("merchants_name")
+  Grubsy_Partner_ID String         @map("Grubsy Partner ID")
+  Food_Category     String?        @map("Food Category")
+  Item              String
+  Regular           String?
+  Medium            String?
+  Large             String?
+  Platter           String?
+  Image             String?
+  Description       String?
+  Notes             String?
+  SKU               String?
+  Created_At        String?        @map("Created At")
+  Updated_At        String?        @map("Updated At")
+  Available         String?
+  LastToggledAt     String?        @map("LastToggledAt")
+  basketItems       Basket_Table[]
+  merchant          Merchants      @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+
+  @@index([Grubsy_Partner_ID], map: "Menu Items_Grubsy Partner ID_fkey")
+  @@map("Menu Items")
+}
+
+model Combo_Options {
+  id                String         @id @default(cuid())
+  Establishment     String?
+  Combo_Name        String?        @map("Combo Name")
+  Option_Name       String?        @map("Option Name")
+  Option_Order      String?        @map("Option Order")
+  Option_Items      String?        @map("Option Items (comma separated)")
+  Combo_Option_ID   String         @unique @map("Combo Option ID")
+  Combo_ID          String?        @map("Combo ID")
+  Grubsy_Partner_ID String         @map("Grubsy Partner ID")
+  Image             String?
+  merchant          Establishments @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+
+  @@index([Grubsy_Partner_ID], map: "Combo Options_Grubsy Partner ID_fkey")
+  @@map("Combo Options")
+}
+
+model Basket_Table {
+  id             String         @id @default(cuid())
+  Basket_ID      String         @unique @map("Basket ID")
+  User_Grubsy_ID String         @map("User Grubsy ID")
+  Merchant_ID    String         @map("Restaurant ID")
+  Menu_Item_ID   String         @map("Menu Item ID")
+  Quantity       String?
+  Price          String?
+  Added_At       String?        @map("Added At")
+  Status         String?
+  menuItem       Menu_Items     @relation(fields: [Menu_Item_ID], references: [Menu_Item_ID])
+  merchant       Establishments @relation(fields: [Merchant_ID], references: [Grubsy_Partner_ID])
+  user           Users          @relation(fields: [User_Grubsy_ID], references: [Grubsy_User_ID])
+
+  @@index([Menu_Item_ID], map: "Basket Table_Menu Item ID_fkey")
+  @@index([Merchant_ID], map: "Basket Table_Restaurant ID_fkey")
+  @@index([User_Grubsy_ID], map: "Basket Table_User Grubsy ID_fkey")
+  @@map("Basket Table")
+}
+
+model Orders {
+  id                     String         @id @default(cuid())
+  Order_ID               String         @unique @map("Order ID")
+  Ordered_Items          String?        @map("Ordered Items")
+  Grubsy_User_ID         String         @map("Grubsy User ID")
+  Grubsy_Partner_ID      String         @map("Grubsy Partner ID")
+  Order_Date             String?        @map("Order Date")
+  Status                 String?
+  Basket_SubTotal        String?        @map("Basket SubTotal")
+  Service_Fee            String?        @map("Service Fee")
+  Delivery_Fee           String?        @map("Delivery Fee")
+  Order_Grand_total      String?        @map("Order Grand total")
+  Tips                   String?
+  Delivery_Address       String?        @map("Delivery Address")
+  Users_Email            String         @map("Users Email")
+  Driver_ID              String?        @map("Driver ID")
+  SKU                    String?
+  Created_At             String?        @map("Created At")
+  Updated_At             String?        @map("Updated At")
+  Payment_Link           String?        @map("Payment Link")
+  Payment_Status         String?        @map("Payment Status")
+  Stripe_Session_ID      String?        @map("Stripe Session ID")
+  Users_Phone_number     String?        @map("Users Phone number")
+  Cordinates             String?
+  Restaurant_Accepted_At String?        @map("Restaurant Accepted At")
+  driver                 Drivers?       @relation(fields: [Driver_ID], references: [Driver_ID])
+  merchant               Merchants @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+  user                   Users          @relation(fields: [Grubsy_User_ID], references: [Grubsy_User_ID])
+
+  @@index([Driver_ID], map: "Orders_Driver ID_fkey")
+  @@index([Grubsy_Partner_ID], map: "Orders_Grubsy Partner ID_fkey")
+  @@index([Grubsy_User_ID], map: "Orders_Grubsy User ID_fkey")
+  @@map("Orders")
+}
+
+model Order_Messages {
+  id           String  @id @default(cuid())
+  Message_ID   String  @unique @map("Message ID")
+  Order_Number String? @map("Order Number")
+  User_Email   String  @map("User Email")
+  Message      String?
+  Time_Stamp   String? @map("Time Stamp")
+  Status       String?
+  User_ID      String  @map("User ID")
+  user         Users   @relation(fields: [User_ID], references: [Grubsy_User_ID])
+
+  @@index([User_ID], map: "Order Messages_User ID_fkey")
+  @@map("Order Messages")
+}
+
+model Drivers {
+  id               String   @id @default(cuid())
+  Driver_ID        String   @unique @map("Driver ID")
+  Name             String
+  Email            String?
+  Phone            String?
+  Vehicle          String?
+  Driving_Licence  String?  @map("Driving Licence")
+  Date_Joined      String?  @map("Date Joined")
+  Status           String?
+  Assigned_Orders  String?  @map("Assigned Orders (Comma Separated)")
+  Created_At       String?  @map("Created At")
+  Last_Login       String?  @map("Last Login")
+  Profile_Photo    String?  @map("Profile Photo")
+  Availability     String?
+  Current_location String?  @map("Current location")
+  orders           Orders[]
+
+  @@map("Drivers")
+}
+
+model Driver_FAQs {
+  id       String @id @default(cuid())
+  Question String
+  Answer   String @db.Text
+
+  @@map("Driver : FAQ's")
+}
+
+model User_FAQs {
+  id       String @id @default(cuid())
+  Question String
+  Answer   String @db.Text
+
+  @@map("User : FAQ's")
+}
+
+model Establishment_FAQs {
+  id       String @id @default(cuid())
+  Question String
+  Answer   String @db.Text
+
+  @@map("FAQ's : Establishment")
+}
+
+model CRM_Back_Office {
+  id             String  @id @default(cuid())
+  CRM_ID         String  @unique @map("CRM ID")
+  User_Grubsy_ID String  @map("User Grubsy ID")
+  Order_Number   String? @map("Order Number")
+  Restaurant_ID  String? @map("Restaurant ID")
+  Status         String?
+  Last_Synced    String? @map("Last Synced")
+  Notes          String?
+
+  @@map("CRM/Back Office")
+}
+
+model Order_Lines {
+  id            String  @id @default(cuid())
+  Order_Line_ID String  @unique @map("Order Line ID")
+  Order_ID      String  @map("Order ID")
+  Menu_Item_ID  String  @map("Menu Item ID")
+  Quantity      String?
+  Price         String?
+  Subtotal      String?
+
+  @@map("Order lines")
+}
+
+model Combos {
+  id                String  @id @default(cuid())
+  Combo_ID          String  @unique @map("Combo ID")
+  Establishment     String?
+  Combo_Name        String? @map("Combo Name")
+  Price             String?
+  Description       String?
+  Available_Times   String? @map("Available Times")
+  Status            String?
+  Created_at        String? @map("Created at:")
+  Grubsy_Partner_ID String? @map("Grubsy Partner ID")
+  Image             String?
+
+  @@map("Combos")
+}
+
+model User_Session {
+  id                 String  @id @default(cuid())
+  Session_ID         String  @unique @map("Session ID")
+  User_Grubsy_ID     String  @map("User Grubsy ID")
+  Manual_Location    String? @map("Manual Location")
+  Search_Location    String? @map("Search Location")
+  Basket_Subtotal    String? @map("Basket Subtotal")
+  Fee                String?
+  Order              String?
+  Grand_Total        String? @map("Grand Total")
+  Cuisines_of_Grubsy String? @map("Cuisines of Grubsy")
+  Created_At         String? @map("Created At")
+
+  @@map("User Session")
+}
+
+model Bookings {
+  id         String @id @default(cuid())
+  Booking_ID String @unique @map("Booking ID")
+
+  @@map("Bookings")
+}
+
+model Delivery_Zones {
+  id                String  @id @default(cuid())
+  Zone_ID           String  @unique @map("Zone ID")
+  Zone_Name         String? @map("Zone Name")
+  Post_Codes        String? @map("Post Codes (Comma Separated)")
+  Status            String?
+  Driver_Fee_Normal String? @map("Driver Fee : Normal hrs")
+  Driver_Fee_Peak   String? @map("Driver Fee: Peak Hours")
+  Peak_Hours_Active String? @map("Peak Hours (4pm-7pm) Active:")
+  Delivery_charge   String? @map("Delivery charge")
+
+  @@map("Delivery Zones")
+}
+
+model Documents {
+  id            String  @id @default(cuid())
+  Document_ID   String  @unique @map("Document ID")
+  Code          String?
+  Description   String?
+  Document_Name String? @map("Document Name")
+  File_URL      String? @map("File URL")
+  SKU           String?
+  Image_URL     String? @map("Image URL")
+  Comments      String?
+
+  @@map("Documents")
+}
+
+model Merchants {
+  id                               String          @id
+  Grubsy_Partner_ID                String          @unique @map("Grubsy Partner ID")
+  merchants_name                   String          @map("merchants_name")
+  Description                      String?
+  Cuisine                          String?
+  Address                          String?
+  Area                             String?
+  PostCode                         String?
+  Hygiene_Rating                   String?         @map("Hygiene Rating")
+  Opening_Times                    String?         @map("Opening Times")
+  Halal_Friendly                   String?         @map("حلال Halal Friendly?")
+  Photo                            String?
+  Booking_Available                String?         @map("Booking Available")
+  Relation                         String?
+  Active                           String?
+  Owner_Email                      String?         @map("Owner Email")
+  Created_at                       String?         @map("Created at")
+  Owners_Name                      String?         @map("Owners Name")
+  Owners_number                    String?         @map("Owners number")
+  Establishments_Enrolement_Status String?         @map("Establishments Enrolement Status")
+  Establishment_Fee_Per_Order      String?         @map("Establishment Fee Per Order")
+  basketItems                      Basket_Table[]
+  comboOptions                     Combo_Options[]
+  menuItems                        Menu_Items[]
+  orders                           Orders[]
+
+  @@map("merchants")
+}

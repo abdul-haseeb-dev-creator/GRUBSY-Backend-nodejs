@@ -1,0 +1,1721 @@
+openapi: 3.0.3
+info:
+  title: Grubsy API
+  description: |
+    **Last verified**: 2025-08-20 | Branch: docs/recover-canonical-sources | Commit: d3bd6e9a
+    
+    Complete API documentation for Grubsy Platform with Phase 6 + Security Hardening Phase A features:
+    - User authentication and order management
+    - Driver authentication and order tracking
+    - Payment processing with Stripe integration
+    - Rate limiting with 429 responses
+    - Idempotency-Key headers for state-changing operations
+    - Webhook security with signature verification
+    - Comprehensive validation error schemas
+  version: 1.0.0
+  contact:
+    name: Grubsy Platform API
+    url: https://github.com/grubsy/platform
+servers:
+  - url: http://localhost:3002
+    description: Development server
+  - url: https://api.grubsy.com
+    description: Production server
+paths:
+  /api/Merchants:
+    get:
+      summary: List merchants
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        slug: { type: string }
+                        isOpen: { type: boolean }
+  /api/Merchants/{id}/menus:
+    get:
+      summary: List menus and items for a merchant
+      parameters:
+        - in: path
+          name: id
+          schema: { type: string }
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      merchant:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          name: { type: string }
+                          slug: { type: string }
+                      menus:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            items:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id: { type: string }
+                                  name: { type: string }
+                                  priceCents: { type: integer }
+                                  currency: { type: string }
+                                  isAvailable: { type: boolean }
+                                  position: { type: integer }
+ # Driver Authentication Endpoints
+ /api/driver/auth/login:
+   post:
+     summary: Driver login with phone and OTP
+     tags:
+       - Driver Authentication
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               phone: { type: string, description: "Driver's phone number" }
+               otp: { type: string, description: "One-time password" }
+             required:
+               - phone
+               - otp
+     responses:
+       '200':
+         description: Login successful
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   type: object
+                   properties:
+                     driver:
+                       $ref: '#/components/schemas/Driver'
+                     accessToken: { type: string }
+                     refreshToken: { type: string }
+       '400':
+         description: Bad request - missing phone or OTP
+       '401':
+         description: Invalid OTP
+ /api/driver/auth/refresh:
+   post:
+     summary: Refresh driver access token
+     tags:
+       - Driver Authentication
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               refreshToken: { type: string }
+             required:
+               - refreshToken
+     responses:
+       '200':
+         description: Token refreshed successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   type: object
+                   properties:
+                     accessToken: { type: string }
+       '401':
+         description: Invalid refresh token
+ # Driver Profile Endpoints
+ /api/driver/profile:
+   get:
+     summary: Get driver profile
+     tags:
+       - Driver Profile
+     security:
+       - driverAuth: []
+     responses:
+       '200':
+         description: Driver profile retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Driver'
+       '401':
+         description: Unauthorized
+       '404':
+         description: Driver not found
+   put:
+     summary: Update driver profile
+     tags:
+       - Driver Profile
+     security:
+       - driverAuth: []
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               name: { type: string }
+               vehicle: { type: string }
+               isAvailable: { type: boolean }
+     responses:
+       '200':
+         description: Profile updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Driver'
+       '401':
+         description: Unauthorized
+ /api/driver/location:
+   put:
+     summary: Update driver location
+     tags:
+       - Driver Profile
+     security:
+       - driverAuth: []
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               lat: { type: number, format: float }
+               lng: { type: number, format: float }
+             required:
+               - lat
+               - lng
+     responses:
+       '200':
+         description: Location updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   type: object
+                   properties:
+                     lat: { type: number }
+                     lng: { type: number }
+                     updatedAt: { type: string, format: date-time }
+       '400':
+         description: Invalid coordinates
+       '401':
+         description: Unauthorized
+ # Driver Order Management
+ /api/driver/orders:
+   get:
+     summary: Get driver's orders
+     tags:
+       - Driver Orders
+     security:
+       - driverAuth: []
+     parameters:
+       - in: query
+         name: status
+         schema:
+           type: string
+           enum: [PENDING, ACCEPTED, PICKED_UP, DELIVERED, REJECTED, CANCELLED]
+         description: Filter by order status
+       - in: query
+         name: limit
+         schema:
+           type: integer
+           default: 20
+         description: Number of orders to return
+       - in: query
+         name: offset
+         schema:
+           type: integer
+           default: 0
+         description: Number of orders to skip
+     responses:
+       '200':
+         description: Orders retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/Order'
+       '401':
+         description: Unauthorized
+ /api/driver/orders/{orderId}/accept:
+   put:
+     summary: Accept an order
+     tags:
+       - Driver Orders
+     security:
+       - driverAuth: []
+     parameters:
+       - in: path
+         name: orderId
+         schema: { type: string }
+         required: true
+     responses:
+       '200':
+         description: Order accepted successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Order'
+       '400':
+         description: Order not available for acceptance
+       '401':
+         description: Unauthorized
+       '404':
+         description: Order not found
+ /api/driver/orders/{orderId}/reject:
+   put:
+     summary: Reject an order
+     tags:
+       - Driver Orders
+     security:
+       - driverAuth: []
+     parameters:
+       - in: path
+         name: orderId
+         schema: { type: string }
+         required: true
+     responses:
+       '200':
+         description: Order rejected successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Order'
+       '400':
+         description: Order cannot be rejected at this stage
+       '401':
+         description: Unauthorized
+       '404':
+         description: Order not found
+ /api/driver/orders/{orderId}/pickup:
+   put:
+     summary: Mark order as picked up
+     tags:
+       - Driver Orders
+     security:
+       - driverAuth: []
+     parameters:
+       - in: path
+         name: orderId
+         schema: { type: string }
+         required: true
+     responses:
+       '200':
+         description: Order marked as picked up
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Order'
+       '400':
+         description: Order must be accepted before pickup
+       '401':
+         description: Unauthorized
+       '404':
+         description: Order not found
+ /api/driver/orders/{orderId}/deliver:
+   put:
+     summary: Mark order as delivered
+     tags:
+       - Driver Orders
+     security:
+       - driverAuth: []
+     parameters:
+       - in: path
+         name: orderId
+         schema: { type: string }
+         required: true
+     responses:
+       '200':
+         description: Order marked as delivered
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 success: { type: boolean }
+                 data:
+                   $ref: '#/components/schemas/Order'
+       '400':
+         description: Order must be picked up before delivery
+       '401':
+         description: Unauthorized
+       '404':
+         description: Order not found
+
+ # Establishment Management Endpoints
+ /api/establishments:
+   get:
+     summary: List all establishments
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     responses:
+       '200':
+         description: Establishments retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/Establishment'
+       '401':
+         description: Authentication required
+   post:
+     summary: Create new establishment
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: header
+         name: Idempotency-Key
+         schema:
+           type: string
+           format: uuid
+         description: UUID to prevent duplicate establishment creation
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               name: { type: string, minLength: 1 }
+               address: { type: string, minLength: 1 }
+               phone: { type: string }
+               email: { type: string, format: email }
+             required:
+               - name
+               - address
+               - phone
+               - email
+     responses:
+       '201':
+         description: Establishment created successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   $ref: '#/components/schemas/Establishment'
+       '400':
+         description: Validation error or duplicate idempotency key
+       '401':
+         description: Authentication required
+       '429':
+         description: Rate limit exceeded (100 requests per 15 minutes)
+
+ /api/establishments/{id}:
+   get:
+     summary: Get establishment details
+     tags:
+       - Establishments
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '200':
+         description: Establishment retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   $ref: '#/components/schemas/Establishment'
+       '404':
+         description: Establishment not found
+   patch:
+     summary: Update establishment
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+       - in: header
+         name: Idempotency-Key
+         schema:
+           type: string
+           format: uuid
+         description: UUID to prevent duplicate updates
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               name: { type: string }
+               address: { type: string }
+               phone: { type: string }
+               email: { type: string, format: email }
+     responses:
+       '200':
+         description: Establishment updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   $ref: '#/components/schemas/Establishment'
+       '400':
+         description: Validation error
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+   delete:
+     summary: Delete establishment
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '204':
+         description: Establishment deleted successfully
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/menu:
+   get:
+     summary: Get establishment menu
+     tags:
+       - Establishments
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '200':
+         description: Menu retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/MenuItem'
+       '404':
+         description: Establishment not found
+   patch:
+     summary: Update entire menu
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               menu:
+                 type: array
+                 items:
+                   $ref: '#/components/schemas/MenuItem'
+     responses:
+       '200':
+         description: Menu updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/MenuItem'
+       '400':
+         description: Validation error
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/menu/{itemId}/availability:
+   patch:
+     summary: Toggle menu item availability
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+       - in: path
+         name: itemId
+         required: true
+         schema:
+           type: string
+         description: Menu item ID
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               available: { type: boolean }
+             required:
+               - available
+     responses:
+       '200':
+         description: Item availability updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   $ref: '#/components/schemas/MenuItem'
+       '400':
+         description: Validation error
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment or menu item not found
+
+ /api/establishments/{id}/orders:
+   get:
+     summary: Get all establishment orders
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+       - in: query
+         name: status
+         schema:
+           type: string
+           enum: [pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled]
+         description: Filter by order status
+       - in: query
+         name: limit
+         schema:
+           type: integer
+           default: 20
+         description: Number of orders to return
+       - in: query
+         name: offset
+         schema:
+           type: integer
+           default: 0
+         description: Number of orders to skip
+     responses:
+       '200':
+         description: Orders retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/EstablishmentOrder'
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/orders/active:
+   get:
+     summary: Get active orders only
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '200':
+         description: Active orders retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/EstablishmentOrder'
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/orders/status-summary:
+   get:
+     summary: Get order counts by status
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '200':
+         description: Order status summary retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: object
+                   properties:
+                     pending: { type: integer }
+                     confirmed: { type: integer }
+                     preparing: { type: integer }
+                     ready: { type: integer }
+                     out_for_delivery: { type: integer }
+                     delivered: { type: integer }
+                     cancelled: { type: integer }
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/orders/history:
+   get:
+     summary: Get order history with filter
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+       - in: query
+         name: from
+         schema:
+           type: string
+           format: date
+         description: Start date for history filter
+       - in: query
+         name: to
+         schema:
+           type: string
+           format: date
+         description: End date for history filter
+       - in: query
+         name: limit
+         schema:
+           type: integer
+           default: 50
+         description: Number of orders to return
+     responses:
+       '200':
+         description: Order history retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/EstablishmentOrder'
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment not found
+
+ /api/establishments/{id}/orders/{orderId}/status:
+   patch:
+     summary: Update order status
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+       - in: path
+         name: orderId
+         required: true
+         schema:
+           type: string
+         description: Order ID
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               status:
+                 type: string
+                 enum: [pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled]
+             required:
+               - status
+     responses:
+       '200':
+         description: Order status updated successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 data:
+                   $ref: '#/components/schemas/EstablishmentOrder'
+       '400':
+         description: Invalid status transition
+       '401':
+         description: Authentication required
+       '403':
+         description: Insufficient permissions
+       '404':
+         description: Establishment or order not found
+
+ /api/establishments/{id}/printer/status:
+   get:
+     summary: Get printer status (DISABLED)
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     responses:
+       '503':
+         description: Printer integration disabled
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string, example: "Feature disabled" }
+                 featureEnabled: { type: boolean, example: false }
+
+ /api/establishments/{id}/printer/print:
+   post:
+     summary: Send print job (DISABLED)
+     tags:
+       - Establishments
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Establishment ID
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               orderId: { type: string }
+               content: { type: string }
+     responses:
+       '503':
+         description: Printer integration disabled
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string, example: "Feature disabled" }
+                 featureEnabled: { type: boolean, example: false }
+
+# User Authentication Endpoints (Phase 6)
+ /api/users/register:
+   post:
+     summary: Register a new user
+     tags:
+       - User Authentication
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               fullName: { type: string, minLength: 1 }
+               email: { type: string, format: email }
+               password: { type: string, minLength: 8 }
+               address: { type: string, minLength: 1 }
+               phone: { type: string }
+               dob: { type: string, format: date }
+             required:
+               - fullName
+               - email
+               - password
+               - address
+               - phone
+               - dob
+     responses:
+       '201':
+         description: User registered successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string }
+                 token: { type: string }
+                 user:
+                   $ref: '#/components/schemas/User'
+       '400':
+         description: Validation error or user already exists
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 error: { type: string }
+                 field: { type: string }
+       '429':
+         description: Rate limit exceeded (5 requests per 15 minutes)
+         content:
+           application/json:
+             schema:
+               $ref: '#/components/schemas/RateLimitError'
+         headers:
+           X-RateLimit-Limit:
+             schema:
+               type: integer
+             description: Request limit per window
+           X-RateLimit-Remaining:
+             schema:
+               type: integer
+             description: Requests remaining in window
+           X-RateLimit-Reset:
+             schema:
+               type: integer
+             description: Window reset time in seconds
+           Retry-After:
+             schema:
+               type: integer
+             description: Seconds to wait before retrying
+
+ /api/users/login:
+   post:
+     summary: Login user
+     tags:
+       - User Authentication
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               email: { type: string, format: email }
+               password: { type: string }
+             required:
+               - email
+               - password
+     responses:
+       '200':
+         description: Login successful
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string }
+                 token: { type: string }
+                 user:
+                   $ref: '#/components/schemas/User'
+       '400':
+         description: Missing email or password
+       '401':
+         description: Invalid credentials
+       '429':
+         description: Rate limit exceeded (10 requests per 15 minutes)
+         content:
+           application/json:
+             schema:
+               $ref: '#/components/schemas/RateLimitError'
+
+ /api/users/refresh:
+   post:
+     summary: Refresh user authentication token
+     tags:
+       - User Authentication
+     security:
+       - bearerAuth: []
+     responses:
+       '200':
+         description: Token refreshed successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string }
+                 token: { type: string }
+       '401':
+         description: Invalid or expired token
+
+ /api/users/profile:
+   get:
+     summary: Get user profile
+     tags:
+       - User Authentication
+     security:
+       - bearerAuth: []
+     responses:
+       '200':
+         description: User profile retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 user:
+                   $ref: '#/components/schemas/User'
+       '401':
+         description: Authentication required
+       '404':
+         description: User not found
+
+ # User Orders Endpoints (Phase 6)
+ /api/orders:
+   post:
+     summary: Create a new order
+     tags:
+       - User Orders
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: header
+         name: Idempotency-Key
+         schema:
+           type: string
+           format: uuid
+         description: UUID to prevent duplicate order creation
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               items:
+                 type: array
+                 items:
+                   type: object
+                   properties:
+                     name: { type: string }
+                     size: { type: string, enum: [Regular, Large, Platter] }
+                     quantity: { type: integer, minimum: 1 }
+                   required: [name, size, quantity]
+               deliveryAddress: { type: string, minLength: 1 }
+               postcode: { type: string }
+               nameOnCard: { type: string }
+               registeredAddress: { type: string }
+               registeredPostcode: { type: string }
+               paymentMethod: { type: string, enum: [stripe, card, paypal, apple_pay, google_pay, klarna] }
+               giftCard: { type: string }
+               subtotal: { type: number, minimum: 0 }
+               deliveryFee: { type: number, minimum: 0 }
+               serviceFee: { type: number, minimum: 0 }
+               grandTotal: { type: number, minimum: 0 }
+             required:
+               - items
+               - deliveryAddress
+               - postcode
+               - paymentMethod
+               - subtotal
+               - deliveryFee
+               - serviceFee
+               - grandTotal
+     responses:
+       '201':
+         description: Order created successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 message: { type: string }
+                 order:
+                   $ref: '#/components/schemas/UserOrder'
+                 payment:
+                   type: object
+                   nullable: true
+                   properties:
+                     clientSecret: { type: string }
+                     paymentIntentId: { type: string }
+       '400':
+         description: Invalid request data or price mismatch
+       '401':
+         description: Authentication required
+       '429':
+         description: Rate limit exceeded (20 requests per hour)
+         content:
+           application/json:
+             schema:
+               $ref: '#/components/schemas/RateLimitError'
+   get:
+     summary: Get user's orders
+     tags:
+       - User Orders
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: query
+         name: status
+         schema:
+           type: string
+           enum: [active]
+         description: Filter orders by status (active = not delivered/cancelled)
+     responses:
+       '200':
+         description: Orders retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 orders:
+                   type: array
+                   items:
+                     $ref: '#/components/schemas/UserOrder'
+       '401':
+         description: Authentication required
+
+ /api/orders/{id}:
+   get:
+     summary: Get specific order by ID
+     tags:
+       - User Orders
+     security:
+       - bearerAuth: []
+     parameters:
+       - in: path
+         name: id
+         required: true
+         schema:
+           type: string
+         description: Order ID or database ID
+     responses:
+       '200':
+         description: Order retrieved successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 order:
+                   $ref: '#/components/schemas/UserOrder'
+       '401':
+         description: Authentication required
+       '404':
+         description: Order not found
+
+ # Payment Endpoints (Phase 6)
+/api/payments/intents:
+    post:
+      summary: Create payment intent for an order
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+            format: uuid
+          description: UUID to prevent duplicate payment intent creation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orderId: { type: string }
+                provider: { type: string, enum: [stripe], default: stripe }
+              required:
+                - orderId
+      responses:
+        '200':
+          description: Payment intent created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  paymentIntent:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      clientSecret: { type: string }
+                      amount: { type: integer }
+                      currency: { type: string }
+                      status: { type: string }
+                  order:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      amount: { type: number }
+                      currency: { type: string }
+        '400':
+          description: Invalid request data
+        '404':
+          description: Order not found
+        '429':
+          description: Rate limit exceeded (10 requests per hour)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+        '501':
+          description: Payment provider not supported
+
+  /api/payments/confirm:
+    post:
+      summary: Confirm payment
+      tags:
+        - Payments
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paymentIntentId: { type: string }
+                orderId: { type: string }
+              required:
+                - paymentIntentId
+                - orderId
+      responses:
+        '202':
+          description: Payment confirmation received, awaiting provider confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  status: { type: string }
+                  order:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      status: { type: string }
+                  note: { type: string }
+        '400':
+          description: Invalid request data
+        '404':
+          description: Order not found or payment intent mismatch
+
+  /api/payments/webhook/stripe:
+   post:
+     summary: Handle Stripe webhook events
+     tags:
+       - Payments
+     description: Webhook endpoint for Stripe payment events with signature verification and idempotency protection
+     parameters:
+       - in: header
+         name: stripe-signature
+         required: true
+         schema:
+           type: string
+         description: Stripe webhook signature for verification
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             description: Stripe webhook payload
+     responses:
+       '200':
+         description: Webhook processed successfully
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 received: { type: boolean }
+       '400':
+         description: Webhook signature verification failed or duplicate event
+       '500':
+         description: Webhook processing failed
+
+ /api/payments/refund:
+   post:
+     summary: Process refund
+     tags:
+       - Payments
+     security:
+       - bearerAuth: []
+     requestBody:
+       required: true
+       content:
+         application/json:
+           schema:
+             type: object
+             properties:
+               orderId: { type: string }
+               amount: { type: number, description: "Refund amount (optional, defaults to full refund)" }
+               reason: { type: string }
+             required:
+               - orderId
+     responses:
+       '501':
+         description: Refund processing not yet implemented
+         content:
+           application/json:
+             schema:
+               type: object
+               properties:
+                 error: { type: string }
+                 message: { type: string }
+                 order: { type: object }
+       '400':
+         description: Invalid request or order not eligible for refund
+       '404':
+         description: Order not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    driverAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Driver JWT token
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        address: { type: string }
+        phone: { type: string }
+        dob: { type: string, format: date }
+        createdAt: { type: string, format: date-time }
+        lastLogin: { type: string, format: date-time, nullable: true }
+
+    UserOrder:
+      type: object
+      properties:
+        orderId: { type: string }
+        userId: { type: string }
+        userEmail: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              size: { type: string }
+              quantity: { type: integer }
+        deliveryAddress: { type: string }
+        postcode: { type: string }
+        paymentMethod: { type: string }
+        subtotal: { type: number }
+        deliveryFee: { type: number }
+        serviceFee: { type: number }
+        grandTotal: { type: number }
+        orderStatus: { type: string }
+        mappedStatus:
+          type: string
+          enum: [Placed, Processing, "On Route", "Picked up", Delivered, Cancelled]
+        createdAt: { type: string, format: date-time }
+        driver:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            fullName: { type: string }
+            phone: { type: string }
+            vehicleType: { type: string }
+        driverLocation:
+          type: object
+          nullable: true
+          properties:
+            lat: { type: number }
+            lng: { type: number }
+
+    Driver:
+      type: object
+      properties:
+        id: { type: string }
+        phone: { type: string }
+        name: { type: string }
+        vehicle: { type: string }
+        rating: { type: number, format: float }
+        isAvailable: { type: boolean }
+        lastLat: { type: number, format: float, nullable: true }
+        lastLng: { type: number, format: float, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        status:
+          type: string
+          enum: [PENDING, ACCEPTED, PICKED_UP, DELIVERED, REJECTED, CANCELLED]
+          description: "Driver order status (uppercase)"
+        driverId: { type: string, nullable: true }
+        driverAssignedAt: { type: string, format: date-time, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            phone: { type: string }
+        restaurant:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            address: { type: string }
+            phone: { type: string }
+        orderItems:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              quantity: { type: integer }
+              menuItem:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  price: { type: number }
+
+   ValidationError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Validation failed"
+       details:
+         type: array
+         items:
+           type: object
+           properties:
+             field:
+               type: string
+               example: "email"
+             message:
+               type: string
+               example: "Invalid email format"
+             code:
+               type: string
+               example: "INVALID_EMAIL"
+
+   RateLimitError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Rate limit exceeded"
+       message:
+         type: string
+         example: "Too many requests. Please try again later."
+       retryAfter:
+         type: integer
+         example: 60
+         description: "Seconds to wait before retrying"
+       limit:
+         type: integer
+         example: 100
+         description: "Request limit per window"
+       remaining:
+         type: integer
+         example: 0
+         description: "Requests remaining in current window"
+       resetTime:
+         type: string
+         format: date-time
+         example: "2025-08-20T20:00:00Z"
+         description: "When the rate limit window resets"
+
+   AuthenticationError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Authentication required"
+       message:
+         type: string
+         example: "Invalid or expired token"
+       code:
+         type: string
+         example: "AUTH_REQUIRED"
+
+   AuthorizationError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Insufficient permissions"
+       message:
+         type: string
+         example: "Manager role required for this operation"
+       code:
+         type: string
+         example: "INSUFFICIENT_PERMISSIONS"
+
+   WebhookSecurityError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Webhook signature verification failed"
+       message:
+         type: string
+         example: "Invalid stripe-signature header"
+       code:
+         type: string
+         example: "WEBHOOK_SIGNATURE_INVALID"
+
+   IdempotencyError:
+     type: object
+     properties:
+       error:
+         type: string
+         example: "Duplicate request detected"
+       message:
+         type: string
+         example: "Request with this Idempotency-Key already processed"
+       code:
+         type: string
+         example: "IDEMPOTENCY_KEY_REUSED"
+       originalResponse:
+         type: object
+         description: "Response from the original request"
+
+   Establishment:
+     type: object
+     properties:
+       id: { type: string }
+       name: { type: string }
+       address: { type: string }
+       phone: { type: string }
+       email: { type: string, format: email }
+       isActive: { type: boolean }
+       createdAt: { type: string, format: date-time }
+       updatedAt: { type: string, format: date-time }
+
+   MenuItem:
+     type: object
+     properties:
+       menuItemId: { type: string }
+       name: { type: string }
+       description: { type: string }
+       price: { type: string, description: "Price stored as string in SheetBest" }
+       category: { type: string }
+       photo: { type: string }
+       available: { type: string, enum: ["TRUE", "FALSE"], description: "String boolean from SheetBest" }
+       outOfStock: { type: string, enum: ["TRUE", "FALSE"], description: "String boolean from SheetBest" }
+       sku: { type: string }
+
+   EstablishmentOrder:
+     type: object
+     properties:
+       id: { type: string }
+       orderId: { type: string }
+       userId: { type: string }
+       userEmail: { type: string }
+       establishmentId: { type: string }
+       status:
+         type: string
+         enum: [pending, confirmed, preparing, ready, out_for_delivery, delivered, cancelled]
+       mappedStatus:
+         type: string
+         enum: [Placed, Processing, "On Route", "Picked up", Delivered, Cancelled]
+       items:
+         type: array
+         items:
+           type: object
+           properties:
+             name: { type: string }
+             size: { type: string }
+             quantity: { type: integer }
+       deliveryAddress: { type: string }
+       postcode: { type: string }
+       paymentMethod: { type: string }
+       subtotal: { type: number }
+       deliveryFee: { type: number }
+       serviceFee: { type: number }
+       grandTotal: { type: number }
+       createdAt: { type: string, format: date-time }
+       updatedAt: { type: string, format: date-time }
+       driver:
+         type: object
+         nullable: true
+         properties:
+           id: { type: string }
+           fullName: { type: string }
+           phone: { type: string }
+           vehicleType: { type: string }
+       driverLocation:
+         type: object
+         nullable: true
+         properties:
+           lat: { type: number }
+           lng: { type: number }

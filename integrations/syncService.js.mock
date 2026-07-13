@@ -1,0 +1,20 @@
+// integrations/syncService.js
+// Mock sync service for testing
+const { createLogger } = require('../src/utils/logger');
+
+const logger = createLogger({ service: 'sync-service' });
+
+const syncOrders = async () => {
+  logger.debug('Mock syncOrders called');
+  // Mock implementation - do nothing for now
+};
+
+exports.startSync = () => {
+  // Mock implementation - don't start the sync interval
+  logger.info('Mock sync service started');
+};
+
+module.exports = {
+  syncOrders,
+  startSync: exports.startSync,
+};

@@ -1,0 +1,16 @@
+// controllers/printer.js
+// Stub controller for printer management and health
+
+exports.getPrinterStatus = async (req, res) => {
+  // TODO: Integrate with actual printer device/service
+  // For now, return stubbed healthy status
+  res.json({ status: 'online', lastChecked: new Date().toISOString(), details: 'Printer is healthy (stub)' });
+};
+
+exports.printOrder = async (req, res) => {
+  // TODO: Integrate with actual printer device/service
+  // Accept order data in req.body
+  const { order } = req.body;
+  // Simulate print job
+  res.json({ success: true, message: 'Print job sent (stub)', order });
+};

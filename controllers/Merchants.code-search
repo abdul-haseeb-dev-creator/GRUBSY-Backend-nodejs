@@ -1,0 +1,1827 @@
+# Query: Merchants
+# ContextLines: 1
+
+626 results - 76 files
+
+Grubsy CSV Data/Grubsy Data Sheets - Merchants.csv:
+  1: Grubsy_Partner_ID,Merchants_Name,Description,Cuisine,Address,Area,PostCode,Hygiene_Rating,Opening_Times,حلال Halal Friendly?,Photo,Booking_Available,Relation,Active,Owner_Email,Created_at,Owners_Name,Owners_Number,Merchant_Enrolement_Status,Merchant_Fee_Per_Order
+  2  Gbr-0001,La Damas,"Le Damas offers a vibrant tapestry of authentic Syrian flavours, seamlessly blending the convenience of fast food with the warmth of traditional Syrian herbs and spices from Damascus.",Syrian,"277a High Street, Slough, Berkshire, SL1 1BN",Slough,SL1,4 Stars ⭐️⭐️⭐️⭐️,Mon-Sun 10am-1am,Yes! 100% Halal,https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/cPIwtkP5E76N00qHOwjw/pub/prRpamdNnMkbk6tIjFiA.png,yes,,active,owner@ledamas.com,2025-06-14,,,Completed,10%
+
+Grubsy CSV Data/Grubsy Data Sheets - Orders.csv:
+  1: Order_ID,Ordered_Items,Grubsy_User_ID,Grubsy_Partner_ID,Order_Date,Status,Basket_SubTotal,Service_Fee,Grubsy_Profit,Delivery_Fee,Order_Grand_Total,Tips,Delivery_Address,Delivery_Instructions,Users_Email,Driver_ID,SKU,Created_At,Delivered_At,Payment_Link,Payment_Status,Stripe_Session_ID,Users_Phone_number,Cordinates,Merchant_Accepted_At:,Driver_PickUp_At:,Merchants_Order_Images,Drivers_Order_Images,USer_Code_Given
+  2  GDS-002BC    ,Null,Grb:U-004PT,Grb-0001,2/9/2025,Pending,£19,£1.90,,£3.50,£24.40,0,"1 washington avenue, Sl1 6rq",,Briancostello@gmail.com,,,15:33,,,,,,,,,,,
+
+Grubsy-Backend/fix-order-data.js:
+  17      
+  18:     // Get proper Merchants with real addresses
+  19:     const Merchants = await prisma.merchant.findMany({
+  20        where: { 
+
+  25      
+  26:     console.log('🏪 Available merchants with proper data:');
+  27:     merchants.forEach(m => console.log(`- ${m.name}: ${m.address}`));
+  28      
+  29:     if (merchants.length === 0) {
+  30:       console.log('❌ No proper merchants found, creating test merchants...');
+  31        
+  32:       const testMerchants = [
+  33          { name: 'La Damas', address: '277a High Street, Slough, Berkshire, SL1 1BN' },
+
+  37        
+  38:       for (const merchant of testMerchants) {
+  39          await prisma.merchant.create({ data: merchant });
+
+  42        
+  43:       // Refresh merchants list
+  44:       const newMerchants = await prisma.merchant.findMany({
+  45          where: { 
+
+  49        });
+  50:       Merchants.push(...newMerchants);
+  51      }
+
+  58        const order = orders[i];
+  59:       const merchant = Merchants[i % Merchants.length];
+  60        
+
+Grubsy-Backend/test-prisma.js:
+  15      // Test merchant query
+  16:     console.log('🏪 Testing Merchants query...');
+  17:     const Merchants = await prisma.Merchants.findMany({
+  18        where: {
+
+  26          id: true,
+  27:         Merchants_Name: true,
+  28          Cuisine: true,
+
+  33      
+  34:     console.log(`✅ Found ${Merchants.length} Merchants:`);
+  35:     Merchants.forEach(m => {
+  36:       console.log(`  - ${m.Merchants_Name} (${m.Cuisine}) - Active: ${m.Active}`);
+  37      });
+
+Grubsy-Backend/controllers/couriers.js:
+  60      // Find merchant for this user
+  61:     const Merchant = await prisma.Merchants.findFirst({
+  62        where: { 'Owner Email': userEmail }
+
+Grubsy-Backend/controllers/establishments.js:
+   1  // DEPRECATED: This controller has been consolidated into /src/api.js
+   2: // All establishment functionality now uses /api/Merchants endpoints
+   3  // This file is kept for reference only - DO NOT USE
+
+   6    error: 'DEPRECATED',
+   7:   message: 'All establishment endpoints have been consolidated to /api/Merchants',
+   8    migration: {
+   9      from: '/api/establishments',
+  10:     to: '/api/Merchants',
+  11:     note: 'Use /src/api.js Merchants endpoints instead'
+  12    }
+
+Grubsy-Backend/controllers/merchants.js:
+    1: // controllers/Merchants.js
+    2  // Merchant management for restaurant operations
+
+    6  /**
+    7:  * Get all Merchants (admin only)
+    8   */
+
+   17  
+   18:     const Merchants = await prisma.Merchants.findMany({
+   19        select: {
+   20          id: true,
+   21:         Merchants_Name: true,
+   22          Active: true,
+
+   32        success: true,
+   33:       data: Merchants
+   34      });
+   35    } catch (error) {
+   36:     console.error('Error fetching Merchants:', error);
+   37      res.status(500).json({
+   38        success: false,
+   39:       error: 'Failed to fetch Merchants'
+   40      });
+
+   44  /**
+   45:  * Get Merchants for current restaurant staff user
+   46   */
+   47: async function getMyMerchants(req, res) {
+   48    try {
+
+   50  
+   51:     // Find Merchants where user is the owner
+   52:     const Merchants = await prisma.Merchants.findMany({
+   53        where: {
+   54          'Owner Email': userEmail,
+   55:         Active: 'Yes' // Only active Merchants
+   56        },
+
+   58          id: true,
+   59:         Merchants_Name: true,
+   60          Active: true,
+
+   67  
+   68:     // If user has no owned Merchants, check if they're staff for any merchant
+   69:     if (Merchants.length === 0) {
+   70        // For now, return empty array - in future could check staff assignments
+
+   78        success: true,
+   79:       data: Merchants
+   80      });
+   81    } catch (error) {
+   82:     console.error('Error fetching user Merchants:', error);
+   83      res.status(500).json({
+   84        success: false,
+   85:       error: 'Failed to fetch Merchants'
+   86      });
+
+   97  
+   98:     const merchant = await prisma.Merchants.findUnique({
+   99        where: { id },
+
+  101          id: true,
+  102:         Merchants_Name: true,
+  103          Active: true,
+
+  124        return res.status(403).json({
+  125:         error: 'Access denied. You can only view your own Merchants.'
+  126        });
+
+  151      // Find the merchant first
+  152:     const merchant = await prisma.Merchants.findUnique({
+  153        where: { id },
+
+  165        return res.status(403).json({
+  166:         error: 'Access denied. You can only update your own Merchants.'
+  167        });
+
+  177      // Update the merchant
+  178:     const updatedMerchant = await prisma.Merchants.update({
+  179        where: { id },
+
+  182          id: true,
+  183:         Merchants_Name: true,
+  184          Active: true,
+
+  206    getAll,
+  207:   getMyMerchants,
+  208    getById,
+
+Grubsy-Backend/controllers/orders.js:
+   68              id: true,
+   69:             Merchants_Name: true,
+   70              Active: true
+
+  185              id: true,
+  186:             Merchants_Name: true,
+  187              Active: true
+
+  305              id: true,
+  306:             Merchants_Name: true,
+  307              Active: true
+
+Grubsy-Backend/controllers/restaurants.js:
+    7    try {
+    8:     // Fetch all restaurants from Prisma database using Merchants table
+    9:     const restaurants = await prisma.Merchants.findMany({
+   10        where: {
+
+   15          Grubsy_Partner_ID: true,
+   16:         Merchants_Name: true,
+   17          Description: true,
+
+   44    try {
+   45:     // Create new restaurant in Prisma database using Merchants table
+   46:     const restaurant = await prisma.Merchants.create({
+   47        data: req.body
+
+   63    try {
+   64:     const restaurant = await prisma.Merchants.findUnique({
+   65        where: { id: req.params.id },
+
+   68          Grubsy_Partner_ID: true,
+   69:         Merchants_Name: true,
+   70          Description: true,
+
+  103    try {
+  104:     const restaurant = await prisma.Merchants.update({
+  105        where: { id: req.params.id },
+
+  109          Grubsy_Partner_ID: true,
+  110:         Merchants_Name: true,
+  111          Description: true,
+
+  138    try {
+  139:     await prisma.Merchants.delete({
+  140        where: { id: req.params.id }
+
+Grubsy-Backend/docs/api/openapi.yaml:
+  24  paths:
+  25:   /api/Merchants:
+  26      get:
+  27:       summary: List Merchants
+  28        responses:
+
+  44                          isOpen: { type: boolean }
+  45:   /api/Merchants/{id}/menus:
+  46      get:
+
+Grubsy-Backend/docs/reports/GRUBSY_PLATFORM_STABILIZATION_REPORT.md:
+  239  
+  240: 1. **Merchants Data:**
+  241     - Establishment details (name, address, cuisine, ratings)
+
+Grubsy-Backend/migrations/001_rename_establishments_to_merchants.sql:
+   1: -- Migration: Rename Establishments table to Merchants and update column names
+   2  -- This preserves all existing data while changing the database structure
+   3  
+   4: -- Step 1: Rename the Establishments table to Merchants
+   5: ALTER TABLE `Establishments` RENAME TO `Merchants`;
+   6  
+   7: -- Step 2: Rename the "Establishment Name" column to Merchants_name
+   8: ALTER TABLE `Merchants` CHANGE COLUMN `Establishment Name` `Merchants_Name` VARCHAR(255);
+   9  
+
+  13  ALTER TABLE `Basket Table` ADD CONSTRAINT `Basket Table_Restaurant ID_fkey` 
+  14:     FOREIGN KEY (`Restaurant ID`) REFERENCES `Merchants`(`Grubsy Partner ID`);
+  15  
+
+  18  ALTER TABLE `Menu Items` ADD CONSTRAINT `Menu Items_Grubsy Partner ID_fkey`
+  19:     FOREIGN KEY (`Grubsy Partner ID`) REFERENCES `Merchants`(`Grubsy Partner ID`);
+  20  
+
+  23  ALTER TABLE `Orders` ADD CONSTRAINT `Orders_Grubsy Partner ID_fkey`
+  24:     FOREIGN KEY (`Grubsy Partner ID`) REFERENCES `Merchants`(`Grubsy Partner ID`);
+  25  
+
+  28  ALTER TABLE `Combo Options` ADD CONSTRAINT `Combo Options_Grubsy Partner ID_fkey`
+  29:     FOREIGN KEY (`Grubsy Partner ID`) REFERENCES `Merchants`(`Grubsy Partner ID`);
+  30  
+  31  -- Verify the migration
+  32: SELECT COUNT(*) as total_Merchants FROM `Merchants`;
+  33: SELECT `Merchants_name`, `Cuisine` FROM `Merchants` LIMIT 5;
+
+Grubsy-Backend/migrations/002_create_merchants_table.sql:
+   1: -- Migration: Create new Merchants table with Merchants_name column
+   2  -- This creates a new table alongside the existing Establishments table
+   3  
+   4: -- Step 1: Create the new Merchants table with Merchants_name column
+   5: CREATE TABLE `Merchants` (
+   6    `id` varchar(191) NOT NULL,
+   7    `Grubsy Partner ID` varchar(191) NOT NULL,
+   8:   `Merchants_name` varchar(255) DEFAULT NULL,
+   9    `Description` text,
+
+  27    PRIMARY KEY (`id`),
+  28:   UNIQUE KEY `Merchants_Grubsy Partner ID_key` (`Grubsy Partner ID`)
+  29  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  30  
+  31: -- Step 2: Copy all data from Establishments to Merchants table
+  32: INSERT INTO `Merchants` (
+  33    `id`,
+  34    `Grubsy_Partner_ID`, 
+  35:   `Merchants_Name`,
+  36    `Description`,
+
+  57    `Grubsy_Partner_ID`,
+  58:   `Establishment Name` AS `Merchants_Name`,  -- Map old column to new Merchants_name
+  59    `Description`,
+
+  79  -- Step 3: Verify the new table
+  80: SELECT COUNT(*) as total_Merchants FROM `Merchants`;
+  81: SELECT `Merchants_Name`, `Cuisine` FROM `Merchants` LIMIT 5;
+
+Grubsy-Backend/migrations/003_add_store_app_fields.sql:
+  34  
+  35: -- Add foreign key for Drivers to Merchants (partner scoping)
+  36: -- Note: Update to match your exact Merchants table primary key
+  37  ALTER TABLE `Drivers` ADD CONSTRAINT `Drivers_Grubsy_Partner_ID_fkey`
+  38:   FOREIGN KEY (`Grubsy_Partner_ID`) REFERENCES `Merchants`(`Grubsy_Partner_ID`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+Grubsy-Backend/Not syncing/openapi.yaml:
+   7  paths:
+   8:   /api/Merchants:
+   9      get:
+  10:       summary: List Merchants
+  11        responses:
+
+  27                          isOpen: { type: boolean }
+  28:   /api/Merchants/{id}/menus:
+  29      get:
+
+Grubsy-Backend/prisma/schema.prisma:
+  150  
+  151: model Merchants {
+  152    id                          String @id @default(cuid())
+  153    Grubsy_Partner_ID           String @unique @map("Grubsy_Partner_ID")
+  154:   Merchants_Name              String? @map("Merchants_Name")
+  155    Description                 String? @db.Text
+
+  202    driverPickupAt        String? @map("Driver_PickUp_At:")
+  203:   merchantOrderImages   String? @map("Merchants_Order_Images")
+  204    driverOrderImages     String? @map("Drivers_Order_Images")
+
+Grubsy-Backend/prisma/schema.prisma.backup:
+   16    menuItem       Menu_Items @relation(fields: [Menu_Item_ID], references: [Menu_Item_ID])
+   17:   merchant       Merchants  @relation(fields: [Merchant_ID], references: [Grubsy_Partner_ID])
+   18    user           Users      @relation(fields: [User_Grubsy_ID], references: [Grubsy_User_ID])
+
+   33    Image             String?
+   34:   merchant          Merchants @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+   35  
+
+   65    Menu_Item_ID      String         @unique @map("Menu Item ID")
+   66:   Merchants_Name    String?        @map("Merchants_ame")
+   67    Grubsy_Partner_ID String         @map("Grubsy Partner ID")
+
+   82    basketItems       Basket_Table[]
+   83:   merchant          Merchants      @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+   84  
+
+  151    driver                 Drivers?       @relation(fields: [Driver_ID], references: [Driver_ID])
+  152:   merchant               Merchants @relation(fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+  153    user                   Users          @relation(fields: [Grubsy_User_ID], references: [Grubsy_User_ID])
+
+  312  
+  313: model Merchants {
+  314    id                               String          @id
+  315    Grubsy_Partner_ID                String          @unique @map("Grubsy Partner ID")
+  316:   Merchants_Name                   String          @map("Merchants_Name")
+  317    Description                      String?
+
+  339  
+  340:   @@map("Merchants")
+  341  }
+
+Grubsy-Backend/routes/merchants.js:
+   1  import express from 'express';
+   2: import { getAll, getMyMerchants, getById, update } from '../controllers/Merchants.js';
+   3  import { authRequired } from '../src/middleware/authRequired.js';
+
+   6  
+   7: // Get all Merchants (for restaurant staff)
+   8  router.get('/', authRequired, getAll);
+   9: // Get Merchants for current user (restaurant staff)
+  10: router.get('/my', authRequired, getMyMerchants);
+  11  // Get a single merchant
+
+Grubsy-Backend/scripts/add-restaurant-photos.js:
+   9      // Update La Damas (Mediterranean) - G-0001
+  10:     await prisma.Merchants.update({
+  11        where: { Grubsy_Partner_ID: 'G-0001' },
+
+  18      // Update Big Boys Kitchen (British) - G-0002  
+  19:     await prisma.Merchants.update({
+  20        where: { Grubsy_Partner_ID: 'G-0002' },
+
+  27      // Update Dodgers Dubai Droids (American Diner) - G-0003
+  28:     await prisma.Merchants.update({
+  29        where: { Grubsy_Partner_ID: 'G-0003' },
+
+  36      // Update Edens Eggs (Breakfast) - G-0004
+  37:     await prisma.Merchants.update({
+  38        where: { Grubsy_Partner_ID: 'G-0004' },
+
+Grubsy-Backend/scripts/check-database.js:
+  14  
+  15:     // Check Merchants
+  16:     const Merchants = await prisma.Merchants.findMany({ select: { Grubsy_Partner_ID: true, Merchants_Name: true } });
+  17:     console.log(`\n🏪 Merchants (${Merchants.length}):`);
+  18:     Merchants.forEach(merchant => console.log(`   - ${merchant.Grubsy_Partner_ID}: ${merchant.Merchants_Name}`));
+  19  
+
+Grubsy-Backend/scripts/check-merchants.js:
+   1: // Check what Merchants exist in the database
+   2  import { PrismaClient } from '@prisma/client';
+
+   4  
+   5: async function checkMerchants() {
+   6    try {
+   7:     console.log('🔍 Checking Merchants in database...');
+   8  
+   9:     const Merchants = await prisma.Merchants.findMany({
+  10        select: {
+
+  12          Grubsy_Partner_ID: true,
+  13:         Merchants_Name: true,
+  14          Cuisine: true,
+
+  20  
+  21:     console.log(`✅ Found ${Merchants.length} Merchants:`);
+  22:     Merchants.forEach((Merchant, index) => {
+  23:       console.log(`${index + 1}. ${merchant.Merchants_Name} (${merchant.Grubsy_Partner_ID}) - ${merchant.Cuisine} - Photo: ${merchant.Photo || 'None'}`);
+  24      });
+
+  26    } catch (error) {
+  27:     console.error('❌ Error checking Merchants:', error);
+  28    } finally {
+
+  32  
+  33: checkMerchants();
+
+Grubsy-Backend/scripts/clean-csv-accurate.js:
+  95    {
+  96:     name: 'Grubsy Data Sheets - Merchants.csv',
+  97      columnMappings: {
+
+Grubsy-Backend/scripts/clean-csv-for-mysql.js:
+   76  const csvFiles = [
+   77:   'Grubsy Data Sheets - Merchants.csv',
+   78    'Grubsy Data Sheets - Users.csv',
+
+  132          cleanedField = convertDate(cleanedField);
+  133:       } else if (fileName.includes('Merchants') && fieldIndex === 15) {
+  134          // Created_at
+
+Grubsy-Backend/scripts/complete-data-import.js:
+  288      console.log(`👥 Users: ${counts[0]}`);
+  289:     console.log(`🏪 Merchants: ${counts[1]}`);
+  290      console.log(`🍽️ Menu_Items: ${counts[2]}`);
+
+Grubsy-Backend/scripts/create-test-orders.js:
+  12      const users = await prisma.users.findMany();
+  13:     const merchants = await prisma.merchants.findMany();
+  14      const drivers = await prisma.drivers.findMany();
+
+  17      console.log(`👥 Users: ${users.length}`);
+  18:     console.log(`🏪 Merchants: ${Merchants.length}`);
+  19      console.log(`🚗 Drivers: ${drivers.length}`);
+  20  
+  21:     if (users.length === 0 || Merchants.length === 0) {
+  22:       console.log('❌ Need users and Merchants to create orders');
+  23        return;
+
+  31          Grubsy_User_ID: users[0].Grubsy_User_ID,
+  32:         Grubsy_Partner_ID: Merchants[0].Grubsy_Partner_ID, // La Damas
+  33          Order_Date: '2024-01-15',
+
+  50          Grubsy_User_ID: users[1]?.Grubsy_User_ID || users[0].Grubsy_User_ID,
+  51:         Grubsy_Partner_ID: Merchants[1]?.Grubsy_Partner_ID || Merchants[0].Grubsy_Partner_ID, // Dodgers Dubai Droids or La Damas
+  52          Order_Date: '2024-01-15',
+
+  69          Grubsy_User_ID: users[2]?.Grubsy_User_ID || users[0].Grubsy_User_ID,
+  70:         Grubsy_Partner_ID: Merchants[2]?.Grubsy_Partner_ID || Merchants[0].Grubsy_Partner_ID, // Edens Eggs or La Damas
+  71          Order_Date: '2024-01-15',
+
+  89          Grubsy_User_ID: users[3]?.Grubsy_User_ID || users[0].Grubsy_User_ID,
+  90:         Grubsy_Partner_ID: Merchants[0].Grubsy_Partner_ID, // La Damas
+  91          Order_Date: '2024-01-15',
+
+Grubsy-Backend/scripts/delete-sample-merchants.js:
+   1: r// Delete the sample Merchants I added by mistake
+   2  import { PrismaClient } from '@prisma/client';
+
+   4  
+   5: async function deleteSampleMerchants() {
+   6    try {
+   7:     console.log('🗑️ Deleting sample Merchants I added by mistake...');
+   8  
+   9:     // Delete the sample Merchants I created
+  10:     const deleted = await prisma.Merchants.deleteMany({
+  11        where: {
+
+  17  
+  18:     console.log(`✅ Deleted ${deleted.count} sample Merchants`);
+  19  
+
+  30  
+  31:     // Check what Merchants remain
+  32:     const remaining = await prisma.Merchants.findMany({
+  33        select: {
+
+  35          Grubsy_Partner_ID: true,
+  36:         Merchants_Name: true,
+  37          Cuisine: true,
+
+  41  
+  42:     console.log(`📊 Remaining Merchants in database: ${remaining.length}`);
+  43      remaining.forEach((merchant, index) => {
+  44:       console.log(`${index + 1}. ${merchant.Merchants_Name} (${merchant.Grubsy_Partner_ID})`);
+  45      });
+
+  47    } catch (error) {
+  48:     console.error('❌ Error deleting sample Merchants:', error);
+  49    } finally {
+
+  53  
+  54: deleteSampleMerchants();
+
+Grubsy-Backend/scripts/final-import-all-data.js:
+   74  
+   75: async function importMerchants() {
+   76:   console.log('\n🏪 IMPORTING MERCHANTS...');
+   77:   const Merchants = await fetchSheetData('Merchants');
+   78    
+   79:   for (const est of Merchants) {
+   80      if (!est['Grubsy Partner ID']) continue;
+
+   82      try {
+   83:       const establishment = await prisma.Merchants.upsert({
+   84          where: { 
+
+  318      await importUsers();
+  319:     await importMerchants();
+  320      await importMenuItems();
+
+  329        prisma.users.count(),
+  330:       prisma.Merchants.count(),
+  331        prisma.menu_Items.count(),
+
+  337      console.log(`👥 Users: ${counts[0]}`);
+  338:     console.log(`🏪 Merchants: ${counts[1]}`);
+  339      console.log(`🍽️ Menu_Items: ${counts[2]}`);
+
+Grubsy-Backend/scripts/import-all-csv-data.js:
+  273  
+  274:           case 'Merchants':
+  275              data = {
+  276                Grubsy_Partner_ID: row['Grubsy_Partner_ID'],
+  277:               Merchants_Name: row['Merchants_Name'],
+  278                Description: row['Description'],
+
+  296              };
+  297:             await prisma.Merchants.upsert({
+  298                where: { Grubsy_Partner_ID: data.Grubsy_Partner_ID },
+
+  330                Driver_PickUp_At: row['Driver_PickUp_At:'],
+  331:               Merchants_Order_Images: row['Merchants_Order_Images'],
+  332                Drivers_Order_Images: row['Drivers_Order_Images'],
+
+  465      await importTable('Users', path.join(csvDir, 'Grubsy Data Sheets - Users (1).csv'));
+  466:     await importTable('Merchants', path.join(csvDir, 'Grubsy Data Sheets - Merchants.csv'));
+  467      await importTable('Drivers', path.join(csvDir, 'Grubsy Data Sheets - Drivers.csv'));
+
+Grubsy-Backend/scripts/import-cleaned-csvs.js:
+  159  
+  160: // Import Merchants
+  161: async function importMerchants() {
+  162:   console.log('📥 Importing Merchants...');
+  163  
+  164:   const csvPath = path.join(cleanedFolder, 'Grubsy Data Sheets - Merchants.csv');
+  165    if (!fs.existsSync(csvPath)) {
+  166:     console.log('⚠️ Merchants CSV not found, skipping...');
+  167      return 0;
+
+  183          Grubsy_Partner_ID: fields[0].trim(),
+  184:         Merchants_Name: fields[1].trim(),
+  185          Description: fields[2].trim() || null,
+
+  211  
+  212:       await prisma.Merchants.create({
+  213          data: merchantData,
+
+  216        importedCount++;
+  217:       console.log(`✅ Imported Merchant: ${MerchantData.Merchants_name}`);
+  218  
+
+  223  
+  224:   console.log(`🎉 Imported ${importedCount} Merchants`);
+  225    return importedCount;
+
+  415      await importDrivers();
+  416:     await importMerchants();
+  417      await importMenuItems();
+
+  424      const summary = await Promise.all([
+  425:       prisma.Merchants.count(),
+  426        prisma.Menu_Items.count(),
+
+  434      console.log('\n📊 Final Database Summary:');
+  435:     console.log(`   Merchants: ${summary[0]}`);
+  436      console.log(`   Menu_Items: ${summary[1]}`);
+
+Grubsy-Backend/scripts/import-from-csv.js:
+   61  
+   62:           case 'Merchants':
+   63              data = {
+   64                Grubsy_Partner_ID: row['Grubsy_Partner_ID'] || row['Grubsy Partner ID'],
+   65:               Merchants_Name: row['Merchants_Name'] || row['Merchants Name'],
+   66                Description: row['Description'],
+
+   84              };
+   85:             await prisma.Merchants.upsert({
+   86                where: { Grubsy_Partner_ID: data.Grubsy_Partner_ID },
+
+  119                Driver_PickUp_At: row['Driver_PickUp_At:'] || row['Driver PickUp At:'],
+  120:               Merchants_Order_Images: row['Merchants_Order_Images'] || row['Merchants_Order_Images'],
+  121                Drivers_Order_Images: row['Drivers_Order_Images'] || row['Drivers_Order_Images'],
+
+  157      await importTable('Users', path.join(csvDir, 'Grubsy Data Sheets - Users (1).csv'));
+  158:     await importTable('Merchants', path.join(csvDir, 'Grubsy Data Sheets - Merchants.csv'));
+  159      await importTable('Orders', path.join(csvDir, 'Grubsy Data Sheets - Orders.csv'));
+
+Grubsy-Backend/scripts/import-menu-items-from-csv.js:
+  35          let partnerId = fields[2].trim();
+  36:         // Convert "Grb-0001" format to "Gbr-0001" format to match Merchants
+  37          if (partnerId.startsWith('Grb-')) {
+
+  40  
+  41:         const merchant = await prisma.Merchants.findUnique({
+  42            where: { Grubsy_Partner_ID: partnerId },
+
+Grubsy-Backend/scripts/import-merchants-from-csv.js:
+   1: // Import Merchants data from CSV file
+   2  import fs from 'fs';
+
+  11  
+  12: async function importMerchantsFromCSV() {
+  13    try {
+  14:     console.log('📥 Starting Merchants import from CSV...');
+  15  
+
+  22  
+  23:     console.log(`📊 Found ${lines.length} Merchants in CSV`);
+  24  
+
+  36            Grubsy_Partner_ID: fields[1].trim(),
+  37:           Merchants_Name: fields[2].trim(),
+  38            Description: fields[3].trim() || null,
+
+  58          // Insert or update merchant
+  59:         await prisma.Merchants.upsert({
+  60            where: { Grubsy_Partner_ID: merchantData.Grubsy_Partner_ID },
+
+  65          importedCount++;
+  66:         console.log(`✅ Imported merchant: ${MerchantData.Merchants_Name} (${MerchantData.Grubsy_Partner_ID})`);
+  67  
+
+  72  
+  73:     console.log(`\n🎉 Successfully imported ${importedCount} Merchants from CSV`);
+  74  
+  75      // Verify import
+  76:     const totalMerchants = await prisma.Merchants.count();
+  77:     console.log(`📊 Total Merchants in database: ${totalMerchants}`);
+  78  
+
+  85  
+  86: importMerchantsFromCSV();
+
+Grubsy-Backend/scripts/import-missing-data.js:
+  610      const summary = await Promise.all([
+  611:       prisma.Merchants.count(),
+  612        prisma.Menu_Items.count(),
+
+  629      console.log('\n📊 Complete Database Summary:');
+  630:     console.log(`   Merchants: ${summary[0]}`);
+  631      console.log(`   Menu_Items: ${summary[1]}`);
+
+Grubsy-Backend/scripts/inspect-sheetbest-data.js:
+   14  const SHEET_TABS = [
+   15:   'Merchants',
+   16    'Users', 
+
+   98      
+   99:     // Special handling for -> Merchants
+  100      if (result.tabName === 'Merchants') {
+  101:       modelName = 'Merchants';
+  102      }
+
+  110        
+  111:       // Special handling for Merchents -> Merchants
+  112        if (result.tabName === 'Merchants' && column.toLowerCase().includes('')) {
+  113          if (column.toLowerCase().includes('name')) {
+  114:           fieldName = 'Merchants_name';
+  115          } else {
+  116:           fieldName = column.replace(//gi, 'Merchants');
+  117          }
+
+Grubsy-Backend/scripts/migrate-establishments-to-merchants.js:
+    1: // Migration script: Rename Establishments table and column to Merchants
+    2  // This fixes all the naming conflicts by updating the actual database structure
+
+    8  
+    9: async function migrateEstablishmentsToMerchants() {
+   10    try {
+   11:     console.log('🔄 Starting database migration: Establishments → Merchants');
+   12      
+   13:     // Step 1: Create new Merchants table with correct structure
+   14:     console.log('📋 Step 1: Creating new Merchants table...');
+   15      await prisma.$executeRaw`
+   16:       CREATE TABLE Merchants (
+   17          id VARCHAR(191) NOT NULL,
+   18          Grubsy_Partner_ID VARCHAR(191) NOT NULL,
+   19:         Merchants_name VARCHAR(191) NOT NULL,
+   20          Description TEXT,
+
+   42  
+   43:     // Step 2: Copy all data from Establishments to Merchants table
+   44:     console.log('📊 Step 2: Copying data from Establishments to Merchants...');
+   45      await prisma.$executeRaw`
+   46:       INSERT INTO Merchants (
+   47:         id, Grubsy_Partner_ID, Merchants_Name, Description, Cuisine, Address, Area, PostCode,
+   48          Hygiene_Rating, Opening_Times, Halal_Friendly, Photo, Booking_Available, Relation,
+
+   71        ADD CONSTRAINT \`Basket Table_Grubsy_Partner_ID_fkey\` 
+   72:       FOREIGN KEY (\`Restaurant ID\`) REFERENCES Merchants(Grubsy_Partner_ID) ON DELETE RESTRICT ON UPDATE CASCADE
+   73      `;
+
+   83        ADD CONSTRAINT \`Menu Items_Grubsy_Partner_ID_fkey\` 
+   84:       FOREIGN KEY (\`Grubsy Partner ID\`) REFERENCES Merchants(Grubsy_Partner_ID) ON DELETE RESTRICT ON UPDATE CASCADE
+   85      `;
+
+   95        ADD CONSTRAINT \`Orders_Grubsy_Partner_ID_fkey\` 
+   96:       FOREIGN KEY (\`Grubsy Partner ID\`) REFERENCES Merchants(Grubsy_Partner_ID) ON DELETE RESTRICT ON UPDATE CASCADE
+   97      `;
+
+  107        ADD CONSTRAINT \`Combo Options_Grubsy_Partner_ID_fkey\` 
+  108:       FOREIGN KEY (\`Grubsy Partner ID\`) REFERENCES Merchants(Grubsy_Partner_ID) ON DELETE RESTRICT ON UPDATE CASCADE
+  109      `;
+
+  116      console.log('✅ Step 5: Verifying migration...');
+  117:     const merchantCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM Merchants`;
+  118:     console.log(`✅ Migration completed successfully! Found ${merchantCount[0].count} Merchants in new table`);
+  119      
+  120      // Show sample data
+  121:     const sampleMerchants = await prisma.$queryRaw`SELECT Merchants_Name, Cuisine, Active FROM Merchants LIMIT 3`;
+  122:     console.log('📋 Sample Merchants data:', sampleMerchants);
+  123  
+
+  132  // Run migration
+  133: migrateEstablishmentsToMerchants()
+  134    .then(() => {
+
+Grubsy-Backend/scripts/restore-merchants-data.js:
+   6  
+   7: async function restoreMerchantsData() {
+   8    try {
+   9:     console.log('🚀 Starting merchants data restoration...');
+  10  
+
+  28  
+  29:       // Map old establishments fields to new merchants fields
+  30        const merchantData = {
+
+  32          Grubsy_Partner_ID: values[1] || `PARTNER_${i}`,
+  33:         merchants_name: values[2] || 'Unknown Restaurant',
+  34          Description: values[3] || '',
+
+  55          // Use upsert to handle duplicates
+  56:         await prisma.merchants.upsert({
+  57            where: { Grubsy_Partner_ID: merchantData.Grubsy_Partner_ID },
+
+  61  
+  62:         console.log(`✅ Imported: ${merchantData.merchants_name}`);
+  63          importedCount++;
+  64        } catch (error) {
+  65:         console.log(`⚠️ Skipped: ${merchantData.merchants_name} (${error.message})`);
+  66          skippedCount++;
+
+  70      console.log(`\n🎯 Restoration complete!`);
+  71:     console.log(`✅ Imported: ${importedCount} merchants`);
+  72:     console.log(`⚠️ Skipped: ${skippedCount} merchants`);
+  73  
+
+  80  
+  81: restoreMerchantsData();
+
+Grubsy-Backend/scripts/restore-real-merchants.js:
+    4  
+    5: async function restoreRealMerchants() {
+    6    try {
+
+    8  
+    9:     // First, delete the sample merchants I added
+   10:     console.log('🗑️ Deleting sample merchants...');
+   11:     const deleted = await prisma.merchants.deleteMany({
+   12        where: {
+
+   17      });
+   18:     console.log(`✅ Deleted ${deleted.count} sample merchants`);
+   19  
+
+   29  
+   30:     // Now add back your REAL merchants
+   31:     console.log('🏪 Adding back your REAL merchants...');
+   32:     await prisma.merchants.createMany({
+   33        data: [
+
+   36            Grubsy_Partner_ID: 'G-REAL-001',
+   37:           Merchants_Name: 'Le Damas',
+   38            Description: 'Authentic Mediterranean cuisine',
+
+   52            Grubsy_Partner_ID: 'G-REAL-002',
+   53:           Merchants_Name: 'Dodger Dubai Droids',
+   54            Description: 'American diner experience',
+
+   68            Grubsy_Partner_ID: 'G-REAL-003',
+   69:           Merchants_Name: 'Edens Eggs',
+   70            Description: 'Fresh breakfast and brunch',
+
+   84            Grubsy_Partner_ID: 'G-REAL-004',
+   85:           Merchants_Name: 'Big Boys Kitchen',
+   86            Description: 'Traditional British cuisine',
+
+  101  
+  102:     console.log('✅ Successfully restored your REAL Merchants:');
+  103      console.log('🏪 Le Damas (Mediterranean)');
+
+  108      // Verify the restoration
+  109:     const Merchants = await prisma.Merchants.findMany({
+  110        select: {
+
+  112          Grubsy_Partner_ID: true,
+  113:         Merchants_Name: true,
+  114          Cuisine: true,
+
+  119  
+  120:     console.log(`\n📊 Current Merchants in database: ${Merchants.length}`);
+  121:     Merchants.forEach((merchant, index) => {
+  122:       console.log(`${index + 1}. ${merchant.Merchants_Name} (${Merchant.Grubsy_Partner_ID}) - ${Merchant.Cuisine} - Photo: ${merchant.Photo || 'None'}`);
+  123      });
+
+  125    } catch (error) {
+  126:     console.error('❌ Error restoring Merchants:', error);
+  127    } finally {
+
+  131  
+  132: restoreRealMerchants();
+
+Grubsy-Backend/scripts/simple-csv-import.js:
+  101  
+  102: async function importMerchants() {
+  103:   const csvPath = path.join(process.cwd(), '../Grubsy CSV Data/Grubsy Data Sheets - Merchants.csv');
+  104    const csvText = fs.readFileSync(csvPath, 'utf8');
+
+  106  
+  107:   console.log(`Importing ${rows.length} merchants...`);
+  108  
+  109    for (const row of rows) {
+  110:     await prisma.merchants.upsert({
+  111        where: { Grubsy_Partner_ID: row['Grubsy_Partner_ID'] },
+  112        update: {
+  113:         Merchants_Name: row['Merchants_Name'],
+  114          Description: row['Description'],
+
+  134          Grubsy_Partner_ID: row['Grubsy_Partner_ID'],
+  135:         Merchants_Name: row['Merchants_Name'],
+  136          Description: row['Description'],
+
+  156    }
+  157:   console.log('✅ Merchants imported');
+  158  }
+
+  195          driverPickupAt: row['Driver_PickUp_At:'],
+  196:         merchantOrderImages: row['Merchants_Order_Images'],
+  197          driverOrderImages: row['Drivers_Order_Images'],
+
+  226          driverPickupAt: row['Driver_PickUp_At:'],
+  227:         merchantOrderImages: row['Merchants_Order_Images'],
+  228          driverOrderImages: row['Drivers_Order_Images'],
+
+  572      await importUsers();
+  573:     await importMerchants();
+  574      await importOrders();
+
+Grubsy-Backend/scripts/simple-establishments-import.js:
+    1: // Simple script to insert basic merchants data
+    2  import { PrismaClient } from '@prisma/client';
+
+    4  
+    5: async function insertBasicMerchants() {
+    6    try {
+
+    9      // Insert La Damas
+   10:     await prisma.merchants.upsert({
+   11        where: { Grubsy_Partner_ID: 'G-0001' },
+
+   15          Grubsy_Partner_ID: 'G-0001',
+   16:         merchants_name: 'La Damas',
+   17          Description: 'Authentic cuisine experience',
+
+   37      // Insert Big Boys Kitchen
+   38:     await prisma.merchants.upsert({
+   39        where: { Grubsy_Partner_ID: 'G-0002' },
+
+   43          Grubsy_Partner_ID: 'G-0002',
+   44:         merchants_name: 'Big Boys Kitchen',
+   45          Description: 'Hearty meals and comfort food',
+
+   65      // Insert Dodgers Dubai Droids
+   66:     await prisma.merchants.upsert({
+   67        where: { Grubsy_Partner_ID: 'G-0003' },
+
+   71          Grubsy_Partner_ID: 'G-0003',
+   72:         merchants_name: 'Dodgers Dubai Droids',
+   73          Description: 'Classic American diner experience',
+
+   93      // Insert Edens Eggs
+   94:     await prisma.merchants.upsert({
+   95        where: { Grubsy_Partner_ID: 'G-0004' },
+
+   99          Grubsy_Partner_ID: 'G-0004',
+  100:         merchants_name: 'Edens Eggs',
+  101          Description: 'Fresh breakfast and egg dishes',
+
+  120  
+  121:     // Update merchants with photo filenames
+  122:     console.log('📸 Updating merchants with photo filenames...');
+  123  
+  124:     await prisma.merchants.update({
+  125        where: { Grubsy_Partner_ID: 'G-0001' },
+
+  128  
+  129:     await prisma.merchants.update({
+  130        where: { Grubsy_Partner_ID: 'G-0002' },
+
+  133  
+  134:     console.log('✅ Successfully inserted 4 merchants');
+  135      console.log('✅ La Damas (Mediterranean) - Photo: Grb-0001.jpg');
+
+  140    } catch (error) {
+  141:     console.error('❌ Error inserting merchants:', error);
+  142    } finally {
+
+  146  
+  147: insertBasicMerchants();
+
+Grubsy-Backend/scripts/update-merchants-to-real.js:
+    1: // Update the sample merchants to your REAL data (instead of delete/create)
+    2  import { PrismaClient } from '@prisma/client';
+
+    4  
+    5: async function updateMerchantsToReal() {
+    6    try {
+    7:     console.log('🔄 Updating sample merchants to your REAL data...');
+    8  
+    9      // Update merchant G-0001 to Le Damas
+   10:     await prisma.merchants.update({
+   11        where: { Grubsy_Partner_ID: 'G-0001' },
+   12        data: {
+   13:         merchants_name: 'Le Damas',
+   14          Description: 'Authentic Mediterranean cuisine',
+
+   28      // Update merchant G-0002 to Dodger Dubai Droids
+   29:     await prisma.merchants.update({
+   30        where: { Grubsy_Partner_ID: 'G-0002' },
+   31        data: {
+   32:         merchants_name: 'Dodger Dubai Droids',
+   33          Description: 'American diner experience',
+
+   47      // Update merchant G-0003 to Edens Eggs
+   48:     await prisma.merchants.update({
+   49        where: { Grubsy_Partner_ID: 'G-0003' },
+   50        data: {
+   51:         merchants_name: 'Edens Eggs',
+   52          Description: 'Fresh breakfast and brunch',
+
+   66      // Update merchant G-0004 to Big Boys Kitchen
+   67:     await prisma.merchants.update({
+   68        where: { Grubsy_Partner_ID: 'G-0004' },
+   69        data: {
+   70:         merchants_name: 'Big Boys Kitchen',
+   71          Description: 'Traditional British cuisine',
+
+   84  
+   85:     console.log('✅ Successfully updated merchants to your REAL data:');
+   86      console.log('🏪 Le Damas (Mediterranean) - G-0001');
+
+   91      // Verify the updates
+   92:     const merchants = await prisma.merchants.findMany({
+   93        select: {
+
+   95          Grubsy_Partner_ID: true,
+   96:         merchants_name: true,
+   97          Cuisine: true,
+
+  102  
+  103:     console.log(`\n📊 Current merchants in database: ${merchants.length}`);
+  104:     merchants.forEach((merchant, index) => {
+  105:       console.log(`${index + 1}. ${merchant.merchants_name} (${merchant.Grubsy_Partner_ID}) - ${merchant.Cuisine} - Photo: ${merchant.Photo || 'None'}`);
+  106      });
+
+  108    } catch (error) {
+  109:     console.error('❌ Error updating merchants:', error);
+  110    } finally {
+
+  114  
+  115: updateMerchantsToReal();
+
+Grubsy-Backend/scripts/update-partial-photos.js:
+  25      for (const update of updates) {
+  26:       await prisma.merchants.update({
+  27          where: { Grubsy_Partner_ID: update.partnerId },
+
+Grubsy-Backend/scripts/update-photos-by-partner-id.js:
+  33      for (const update of updates) {
+  34:       await prisma.Merchants.update({
+  35          where: { Grubsy_Partner_ID: update.partnerId },
+
+Grubsy-Backend/scripts/update-photos-correct-partner-ids.js:
+  37      for (const update of updates) {
+  38:       await prisma.merchants.update({
+  39          where: { Grubsy_Partner_ID: update.partnerId },
+
+Grubsy-Backend/scripts/update-with-your-photos.js:
+   9      // Update La Damas - Mediterranean (G-0001)
+  10:     await prisma.Merchants.update({
+  11        where: { Grubsy_Partner_ID: 'G-0001' },
+
+  18      // Update Big Boys Kitchen - British (G-0002)  
+  19:     await prisma.Merchants.update({
+  20        where: { Grubsy_Partner_ID: 'G-0002' },
+
+  27      // Update Dodgers Dubai Droids - American Diner (G-0003)
+  28:     await prisma.Merchants.update({
+  29        where: { Grubsy_Partner_ID: 'G-0003' },
+
+  36      // Update Edens Eggs - Breakfast (G-0004)
+  37:     await prisma.Merchants.update({
+  38        where: { Grubsy_Partner_ID: 'G-0004' },
+
+Grubsy-Backend/src/api.js:
+    8  import driversRouter from './drivers.js';
+    9: import merchantsRouter from '../routes/merchants.js';
+   10  import couriersRouter from '../routes/couriers.js';
+
+   14  
+   15: // Merchant endpoints (querying Merchants table)
+   16: router.get('/merchants', async (req, res) => {
+   17    const { cuisine, bookable } = req.query;
+
+   36  
+   37:     const merchants = await prisma.Merchants.findMany({
+   38        where,
+
+   41          Grubsy_Partner_ID: true,
+   42:         Merchants_Name: true,
+   43          Description: true,
+
+   56  
+   57:     console.log(`✅ Found ${merchants.length} merchants in MySQL database`);
+   58      
+   59:     const restaurants = merchants.map(est => ({
+   60        id: est.id,
+   61        partnerId: est.Grubsy_Partner_ID,
+   62:       name: est.Merchants_Name,
+   63        description: est.Description,
+
+   96  
+   97: router.get('/merchants/:id', async (req, res) => {
+   98    const { id } = req.params;
+
+  101    try {
+  102:     const merchant = await prisma.Merchants.findUnique({
+  103        where: { id },
+
+  106          Grubsy_Partner_ID: true,
+  107:         Merchants_Name: true,
+  108          Description: true,
+
+  126        partnerId: merchant.Grubsy_Partner_ID,
+  127:       name: merchant.Merchants_Name,
+  128        description: merchant.Description,
+
+  158  
+  159: router.get('/merchants/:id/menu', async (req, res) => {
+  160    const { id } = req.params;
+
+  165      
+  166:     const merchant = await prisma.Merchants.findUnique({
+  167        where: { id },
+
+  286        include: {
+  287:         merchants: {
+  288            select: {
+  289:             Merchants_Name: true,
+  290              Address: true
+
+  317          deliveryAddress: order.Delivery_Address,
+  318:         restaurantName: order.merchants?.Merchants_Name || 'Unknown Restaurant'
+  319        };
+
+  377  // Restaurant operations routes
+  378: router.use('/merchants', merchantsRouter);
+  379  router.use('/couriers', couriersRouter);
+
+  710        include: {
+  711:         merchants: {
+  712            select: {
+  713:             Merchants_Name: true
+  714            }
+
+  733          id: order.id,
+  734:         restaurantName: order.merchants?.Merchants_Name || 'Restaurant',
+  735          deliveryFee: parseFloat(order.Delivery_Fee || '3.15'),
+
+  770        include: {
+  771:         merchants: {
+  772            select: {
+  773:             Merchants_Name: true
+  774            }
+
+  781        orderId: order.Order_ID,
+  782:       restaurant: order.merchants?.Merchants_Name || 'Restaurant',
+  783        baseAmount: parseFloat(order.Delivery_Fee || '3.15'),
+
+Grubsy-Backend/src/drivers.js:
+  150        include: {
+  151:         merchants: {
+  152            select: {
+  153:             Merchants_Name: true,
+  154              Address: true,
+
+  173        // Include related data
+  174:       merchant: order.merchants ? {
+  175:         Merchant: order.merchants.Merchants_Name,
+  176:         Address: order.merchants.Address,
+  177:         Owners_Number: order.merchants.Owners_Number
+  178        } : null,
+  179:       establishments: order.merchants ? {
+  180:         Address: order.merchants.Address,
+  181:         Owners_Number: order.merchants.Owners_Number
+  182        } : null,
+
+  229        include: {
+  230:         merchants: {
+  231            select: {
+  232:             Merchants_Name: true,
+  233              Address: true,
+
+  244        status: orders[0].Status,
+  245:       merchant: orders[0].merchants,
+  246        deliveryAddress: orders[0].Delivery_Address
+
+  260        // Include related data
+  261:       merchant: order.merchants ? {
+  262:         Merchant: order.merchants.Merchants_Name,
+  263:         Address: order.merchants.Address,
+  264:         Owners_Number: order.merchants.Owners_Number
+  265        } : null,
+  266:       establishments: order.merchants ? {
+  267:         Address: order.merchants.Address,
+  268:         Owners_Number: order.merchants.Owners_Number
+  269        } : null,
+
+  277        // Add simplified fields for frontend compatibility
+  278:       merchantName: order.merchants?.Merchants_Name || 'Restaurant',
+  279:       merchantAddress: order.merchants?.Address || 'Address not available',
+  280        customerPostcode: order.Delivery_Address?.split(',').pop()?.trim() || '',
+
+  335          },
+  336:         merchants: {
+  337            select: {
+  338              id: true,
+  339:             Merchants_Name: true,
+  340              Address: true,
+
+  436          },
+  437:         merchants: {
+  438            select: {
+  439              id: true,
+  440:             Merchants_Name: true,
+  441              Address: true,
+
+  498              id: true,
+  499:             Merchants_Name: true,
+  500              Address: true,
+
+Grubsy-Backend/src/config/enums.js:
+  18  
+  19: // Menu Category Enum - for merchants menu organization
+  20  const MenuCategory = Object.freeze({
+
+Grubsy-Backend/tests/api.spec.js:
+   9  
+  10: describe('Merchants API', () => {
+  11:   it('lists merchants', async () => {
+  12:     const res = await request(app).get('/api/Merchants');
+  13      expect(res.status).toBe(200);
+
+Grubsy-Backend/tests/auth_orders.spec.js:
+  14  
+  15:   it('lists merchants and picks one', async () => {
+  16:     const res = await request(app).get('/api/Merchants');
+  17      expect(res.status).toBe(200);
+
+  32    it('gets menus and picks an item', async () => {
+  33:     const res = await request(app).get(`/api/Merchants/${merchantId}/menus`);
+  34      expect(res.status).toBe(200);
+
+Grubsy-Backend/tests/payments.spec.js:
+  23      // Create an order first
+  24:     const merchantsRes = await request(app).get('/api/Merchants');
+  25:     const merchantId = merchantsRes.body.data[0].id;
+  26  
+  27:     const menusRes = await request(app).get(`/api/Merchants/${merchantId}/menus`);
+  28      const menuItemId = menusRes.body.data.menus[0].items[0].id;
+
+Grubsy-Backend/tests/integration/setup.js:
+  6    PrismaClient: jest.fn().mockImplementation(() => ({
+  7:     merchants: {
+  8        create: jest.fn().mockResolvedValue({ success: true }),
+
+Grubsy-Backend/tests/unit/controllers/establishments.test.js:
+   6    PrismaClient: jest.fn().mockImplementation(() => ({
+   7:     merchants: {
+   8        findMany: jest.fn(),
+
+  17  
+  18: describe('Merchants Controller (Prisma-based)', () => {
+  19    let app;
+
+  25      // Use the new Prisma-based API routes
+  26:     app.use('/api/merchants', require('../../../src/api'));
+  27      
+
+  31  
+  32:   describe('GET /api/merchants', () => {
+  33:     it('should return all active merchants', async () => {
+  34:       const mockMerchants = [
+  35          {
+  36            id: '1',
+  37:           merchants_name: 'Test Restaurant',
+  38            Address: '123 Test St',
+
+  43  
+  44:       mockPrisma.merchants.findMany.mockResolvedValue(mockMerchants);
+  45  
+  46        const response = await request(app)
+  47:         .get('/api/merchants')
+  48          .expect(200);
+  49  
+  50:       expect(mockPrisma.merchants.findMany).toHaveBeenCalledWith({
+  51          where: {
+
+  62      it('should handle database errors', async () => {
+  63:       mockPrisma.merchants.findMany.mockRejectedValue(new Error('Database error'));
+  64  
+  65        const response = await request(app)
+  66:         .get('/api/merchants')
+  67          .expect(500);
+
+  72  
+  73:   describe('GET /api/merchants/:id', () => {
+  74      it('should return a specific merchant', async () => {
+
+  76          id: '1',
+  77:         merchants_name: 'Test Restaurant',
+  78          Address: '123 Test St',
+
+  82  
+  83:       mockPrisma.merchants.findUnique.mockResolvedValue(mockMerchant);
+  84  
+  85        const response = await request(app)
+  86:         .get('/api/merchants/1')
+  87          .expect(200);
+  88  
+  89:       expect(mockPrisma.merchants.findUnique).toHaveBeenCalledWith({
+  90          where: { id: '1' },
+
+  95      it('should handle non-existent merchant', async () => {
+  96:       mockPrisma.merchants.findUnique.mockResolvedValue(null);
+  97  
+  98        const response = await request(app)
+  99:         .get('/api/merchants/999')
+  100          .expect(404);
+
+Grubsy-driver-app/lib/apiClient.ts:
+   60        // Get establishment name from merchant data
+   61:       const establishmentName = backendOrder.merchant?.Merchants_Name || backendOrder.merchant?.Merchant || 'Establishment';
+   62        
+
+  277      // Get establishment name from merchant data
+  278:     const establishmentName = backendOrder.merchant?.Merchants_Name || backendOrder.merchant?.Merchant || 'Establishment';
+  279      
+
+Grubsy-driver-app/services/apiClient.ts:
+  15  
+  16: // Get all merchants (restaurants)
+  17  export async function getRestaurants() {
+  18    try {
+  19:     const response = await apiClient.get('/merchants');
+  20      return response.data;
+  21    } catch (err) {
+  22:     console.error('Failed to get merchants:', err);
+  23      throw err;
+
+  29    try {
+  30:     const response = await apiClient.get(`/merchants/${id}`);
+  31      return response.data;
+
+  40    try {
+  41:     const response = await apiClient.get(`/merchants/${merchantId}/menu`);
+  42      return response.data;
+
+Grubsy-driver-app/services/dataConnectionService.ts:
+  73  
+  74:     // Test merchants endpoint
+  75:     results.push(await this.testEndpoint('Merchants API', `${baseUrl}/merchants?limit=1`));
+  76  
+
+Grubsy-establishments-app/src/api/client.ts:
+    1  // Clean API client for Grubsy Establishments App
+    2: // Uses axios to call backend API with Prisma merchants table endpoints
+    3  import axios from 'axios';
+
+   82    try {
+   83:     const response = await apiClient.post('/merchants/auth/login', { email, password });
+   84      return response.data;
+
+   92    try {
+   93:     await apiClient.post('/merchants/auth/logout');
+   94    } catch (error) {
+
+  102    try {
+  103:     const response = await apiClient.post('/merchants/auth/refresh');
+  104      return response.data;
+
+  113    try {
+  114:     const response = await apiClient.get('/merchants/profile');
+  115      return response.data;
+
+  123    try {
+  124:     const response = await apiClient.put('/merchants/profile', data);
+  125      return response.data;
+
+  134    try {
+  135:     const response = await apiClient.get('/merchants/orders', { params });
+  136      return response.data;
+
+  144    try {
+  145:     const response = await apiClient.get(`/merchants/orders/${id}`);
+  146      return response.data;
+
+  154    try {
+  155:     const response = await apiClient.put(`/merchants/orders/${id}/status`, { status });
+  156      return response.data;
+
+  164    try {
+  165:     const response = await apiClient.post(`/merchants/orders/${id}/refund`, { reason });
+  166      return response.data;
+
+  175    try {
+  176:     const response = await apiClient.get('/merchants/menu');
+  177      return response.data;
+
+  185    try {
+  186:     const response = await apiClient.get(`/merchants/menu/${id}`);
+  187      return response.data;
+
+  195    try {
+  196:     const response = await apiClient.post('/merchants/menu', data);
+  197      return response.data;
+
+  205    try {
+  206:     const response = await apiClient.put(`/merchants/menu/${id}`, data);
+  207      return response.data;
+
+  215    try {
+  216:     const response = await apiClient.patch(`/merchants/menu/${id}/availability`, { available });
+  217      return response.data;
+
+  225    try {
+  226:     const response = await apiClient.delete(`/merchants/menu/${id}`);
+  227      return response.data;
+
+  236    try {
+  237:     const response = await apiClient.get('/merchants/inventory');
+  238      return response.data;
+
+  246    try {
+  247:     const response = await apiClient.get(`/merchants/inventory/${id}`);
+  248      return response.data;
+
+  256    try {
+  257:     const response = await apiClient.put(`/merchants/inventory/${id}`, data);
+  258      return response.data;
+
+  266    try {
+  267:     const response = await apiClient.post('/merchants/inventory', data);
+  268      return response.data;
+
+  277    try {
+  278:     const response = await apiClient.get('/merchants/reviews', { params });
+  279      return response.data;
+
+  287    try {
+  288:     const response = await apiClient.get('/merchants/reviews/stats');
+  289      return response.data;
+
+  298    try {
+  299:     const response = await apiClient.get('/merchants/analytics', {
+  300        params: { startDate, endDate }
+
+  310    try {
+  311:     const response = await apiClient.get('/merchants/dashboard/stats');
+  312      return response.data;
+
+  321    try {
+  322:     const response = await apiClient.get('/merchants/dashboard/summary');
+  323      return response.data;
+
+  331    try {
+  332:     const response = await apiClient.get('/merchants/dashboard/revenue-8months');
+  333      return response.data;
+
+  341    try {
+  342:     const response = await apiClient.get('/merchants/dashboard/top-categories');
+  343      return response.data;
+
+  351    try {
+  352:     const response = await apiClient.get('/merchants/dashboard/orders-week');
+  353      return response.data;
+
+  361    try {
+  362:     const response = await apiClient.get('/merchants/dashboard/order-types');
+  363      return response.data;
+
+  371    try {
+  372:     const response = await apiClient.get('/merchants/menu/trending', { params });
+  373      return response.data;
+
+  381    try {
+  382:     const response = await apiClient.get('/merchants/orders/recent', { params });
+  383      return response.data;
+
+  391    try {
+  392:     const response = await apiClient.get('/merchants/reviews/recent', { params });
+  393      return response.data;
+
+  401    try {
+  402:     const response = await apiClient.get('/merchants/activity/recent', { params });
+  403      return response.data;
+
+  412    try {
+  413:     const response = await apiClient.post(`/merchants/orders/${id}/accept`);
+  414      return response.data;
+
+  422    try {
+  423:     const response = await apiClient.post(`/merchants/orders/${id}/reject`, { reason });
+  424      return response.data;
+
+  441  
+  442:     const response = await apiClient.post(`/merchants/orders/${id}/photo`, formData, {
+  443        headers: {
+
+  459    try {
+  460:     const response = await apiClient.post(`/merchants/orders/${id}/delivered`);
+  461      return response.data;
+
+  469    try {
+  470:     const response = await apiClient.get('/merchants/orders/console');
+  471      return response.data;
+
+Grubsy-establishments-app/web/app.js:
+  430      // Try to fetch profile picture from API
+  431:     fetch(`${API_BASE}/establishments/merchants/${partnerId}/profile-picture`, {
+  432          headers: {
+
+grubsy-store-app/app.json:
+  11      "platforms": ["ios", "android", "web"],
+  12:     "description": "Store management dashboard for Grubsy merchants with order processing, analytics, and inventory management.",
+  13      "githubUrl": "https://github.com/grubsy/grubsy-platform",
+
+grubsy-store-app/components/ui/MerchantSelector.tsx:
+   3  import { COLORS, SPACING } from "../../constants/index";
+   4: import { listMerchants, fetchMerchantProfileById } from "../../lib/api";
+   5  import { useSessionStore, useUIStore } from "../../lib/store";
+
+   7  
+   8: export function MerchantSelector() {
+   9:   const open = useUIStore((s) => s.merchantSelectorOpen);
+  10:   const setOpen = useUIStore((s) => s.setMerchantSelectorOpen);
+  11    const setSession = useSessionStore((s) => s.setSession);
+  12    const [busy, setBusy] = useState(false);
+  13:   const [merchants, setMerchants] = useState<{ id: string; name?: string }[]>([]);
+  14    const [error, setError] = useState<string | undefined>();
+
+  21        try {
+  22:         const list = await listMerchants();
+  23          // If exactly one, auto select and close
+
+  27          }
+  28:         setMerchants(list.map((m) => ({ id: String(m.id), name: m.name || `Merchant ${m.id}` })));
+  29        } catch (e: any) {
+  30:         setError(e?.message || "Failed to load merchants");
+  31        } finally {
+
+  62            <FlatList
+  63:             data={merchants}
+  64              keyExtractor={(m) => m.id}
+
+grubsy-store-app/components/ui/TopBar.tsx:
+   4  import { useSessionStore } from "../../lib/store";
+   5: import { fetchMerchantProfileById, toggleAcceptingOrders, listMerchants } from "../../lib/api";
+   6  import Toast from "react-native-toast-message";
+
+  11    const setSession = useSessionStore((s) => s.setSession);
+  12:   const setMerchantSelectorOpen = useUIStore((s) => s.setMerchantSelectorOpen);
+  13  
+
+  22          // No merchant selected — see how many exist
+  23:         const list = await listMerchants();
+  24          if (list.length === 1) {
+
+  28          } else {
+  29:           setMerchantSelectorOpen(true);
+  30          }
+
+  39        if (!merchantId) {
+  40:         setMerchantSelectorOpen(true);
+  41          return;
+
+  54          {!merchantId ? (
+  55:           <TouchableOpacity onPress={() => setMerchantSelectorOpen(true)} style={{ backgroundColor: colors.primary, paddingHorizontal: spacing(2), paddingVertical: spacing(1), borderRadius: radii.md }}>
+  56              <Text style={{ color: "#08111F", fontWeight: "800" }}>Select merchant</Text>
+
+grubsy-store-app/lib/api.ts:
+  140  
+  141:   // Merchant methods (calling /merchants endpoints)
+  142:   async getMerchants(cuisine?: string): Promise<any[]> {
+  143:     const url = cuisine ? `/merchants?cuisine=${encodeURIComponent(cuisine)}` : '/merchants';
+  144      return this.request<any[]>(url);
+
+  147    async getMerchantById(id: string): Promise<any> {
+  148:     return this.request<any>(`/merchants/${id}`);
+  149    }
+
+  151    async getMerchantMenu(restaurantId: string): Promise<any[]> {
+  152:     return this.request<any[]>(`/merchants/${restaurantId}/menu`);
+  153    }
+
+  155    async getMerchantOrders(merchantId: string): Promise<any[]> {
+  156:     return this.request<any[]>(`/merchants/${merchantId}/orders`);
+  157    }
+
+  251      const [merchant, orders] = await Promise.all([
+  252:       apiClient.get<any>(`/merchants/${MERCHANT_ID}`),
+  253:       apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders`)
+  254      ]);
+
+  291      // Try real backend first
+  292:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders`);
+  293      return response;
+
+  311    try {
+  312:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/menu`);
+  313      return response;
+
+  328    try {
+  329:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders`);
+  330      return response;
+
+  338    try {
+  339:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders`);
+  340      return response;
+
+  348    try {
+  349:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/menu`);
+  350      return response;
+
+  358    try {
+  359:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders`);
+  360      const orders = response || [];
+
+  398    try {
+  399:     const response = await apiClient.patch<any>(`/merchants/${MERCHANT_ID}/orders/${id}/status`, {
+  400        status: 'accepted'
+
+  410    try {
+  411:     const response = await apiClient.patch<any>(`/merchants/${MERCHANT_ID}/orders/${id}/status`, {
+  412        status: 'rejected',
+
+  434    try {
+  435:     const response = await apiClient.patch<any>(`/merchants/${MERCHANT_ID}/orders/${id}/status`, {
+  436        status: 'delivered'
+
+  446    try {
+  447:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/orders/active`);
+  448      return response;
+
+  457    try {
+  458:     const response = await apiClient.get<any[]>(`/merchants/${MERCHANT_ID}/menu`);
+  459      return response;
+
+  467    try {
+  468:     const response = await apiClient.patch<any>(`/merchants/${MERCHANT_ID}/menu/${id}/availability`, { available });
+  469      return response;
+
+grubsy-store-app/lib/apiClient.ts:
+  163  
+  164:   // Merchant methods (calling /merchants endpoints)
+  165:   async getMerchants(cuisine?: string): Promise<Restaurant[]> {
+  166:     const url = cuisine ? `/merchants?cuisine=${encodeURIComponent(cuisine)}` : '/merchants';
+  167      return this.request<Restaurant[]>(url);
+
+  170    async getMerchantById(id: string): Promise<Restaurant> {
+  171:     return this.request<Restaurant>(`/merchants/${id}`);
+  172    }
+
+  174    async getMerchantMenu(restaurantId: string): Promise<MenuItem[]> {
+  175:     return this.request<MenuItem[]>(`/merchants/${restaurantId}/menu`);
+  176    }
+  177  
+  178:   async getBookableMerchants(): Promise<Restaurant[]> {
+  179:     return this.request<Restaurant[]>('/merchants?bookable=yes');
+  180    }
+
+  183    async getRestaurants(cuisine?: string): Promise<Restaurant[]> {
+  184:     return this.getMerchants(cuisine);
+  185    }
+
+  195    async getBookableRestaurants(): Promise<Restaurant[]> {
+  196:     return this.getBookableMerchants();
+  197    }
+
+  238    async toggleMerchantActive(merchantId: string, active: boolean): Promise<any> {
+  239:     return this.request<any>(`/merchants/${merchantId}/toggle-active`, {
+  240        method: 'PATCH',
+
+  296      try {
+  297:       const merchants = await this.getMerchants();
+  298        if (__DEV__) {
+  299:         console.log('Merchants for cuisine extraction:', merchants.length);
+  300:         console.log('Sample merchant:', merchants[0]);
+  301        }
+  302        
+  303:       const cuisines = merchants
+  304          .map((r) => r.cuisine)
+
+  343  export const fetchCuisines = () => apiClient.getCuisines();
+  344: export const fetchRestaurants = (cuisine?: string) => apiClient.getMerchants(cuisine);
+  345  export const fetchRestaurantById = (id: string) => apiClient.getMerchantById(id);
+
+grubsy-store-app/lib/store.ts:
+   21  
+   22:   merchantSelectorOpen: boolean;
+   23:   setMerchantSelectorOpen: (open: boolean) => void;
+   24  };
+
+   44  
+   45:   merchantSelectorOpen: false,
+   46:   setMerchantSelectorOpen: (open) => set({ merchantSelectorOpen: open })
+   47  }));
+
+   65    // cache for selector
+   66:   merchants?: MerchantLite[];
+   67  
+
+   83    selectedPartnerActive: undefined,
+   84:   merchants: undefined,
+   85    setSession: (s) => set((prev) => ({ ...prev, ...s })),
+
+  102        selectedPartnerActive: undefined,
+  103:       merchants: undefined
+  104      })
+
+Grubsy-user-app/checkEndpoints.js:
+  18  (async () => {
+  19:   await check('/Merchants');
+  20:   await check('/Merchants?cuisine=Indian');
+  21:   await check('/Merchants?bookable=yes');
+  22    // Add more checks as needed
+
+Grubsy-user-app/app/(tabs)/restaurants/index.tsx:
+  28  
+  29:   // Fetch cuisines from merchants table only - no hardcoded fallbacks
+  30    useEffect(() => {
+
+Grubsy-user-app/docs/BACKEND_INTEGRATION.md:
+  129  ### Restaurant Endpoints
+  130: - `GET /api/Merchants` - Get all restaurants
+  131: - `GET /api/Merchants?cuisine=X` - Filter by cuisine
+  132: - `GET /api/Merchants/:id` - Get specific restaurant
+  133: - `GET /api/Merchants/:id/menu` - Get restaurant menu
+  134  
+
+Grubsy-user-app/lib/api.ts:
+   17  
+   18: // Fetch all cuisines (from backend, derived from merchants)
+   19  export const fetchCuisines = async (): Promise<string[]> => {
+
+   21      // Skip cache for now to avoid corrupted data issues - fetch fresh from API
+   22:     const merchants = await apiClient.getRestaurants();
+   23:     await setRestaurantCache(merchants);
+   24      
+   25:     const cuisines = merchants.map((r) => r.cuisine).filter(Boolean);
+   26      return Array.from(new Set(cuisines)).sort() as string[];
+
+   28      if (__DEV__) {
+   29:       console.error(`Error fetching cuisines from merchants:`, error);
+   30      }
+
+   35  
+   36: // Fetch merchants from backend with caching
+   37  export const fetchRestaurants = async (cuisine?: string): Promise<Restaurant[]> => {
+
+   39      if (__DEV__) {
+   40:       console.log(`🔍 Fetching merchants${cuisine ? ` for cuisine: ${cuisine}` : ''}`);
+   41      }
+
+   43      // TEMPORARILY DISABLE CACHE - fetch fresh from API
+   44:     const merchants = await apiClient.getMerchants(cuisine);
+   45      
+   46      if (__DEV__) {
+   47:       console.log(`✅ Merchants fetched successfully: ${merchants.length} merchants`);
+   48      }
+   49      
+   50:     await setRestaurantCache(merchants);
+   51:     return merchants;
+   52    } catch (error) {
+   53      if (__DEV__) {
+   54:       console.error('❌ Error fetching merchants:', {
+   55          cuisine,
+
+  127    try {
+  128:     return await apiClient.getBookableMerchants();
+  129    } catch (error) {
+
+Grubsy-user-app/lib/apiClient.ts:
+  163  
+  164:   // Merchant methods (calling /merchants endpoints)
+  165:   async getMerchants(cuisine?: string): Promise<Restaurant[]> {
+  166:     const url = cuisine ? `/merchants?cuisine=${encodeURIComponent(cuisine)}` : '/merchants';
+  167      return this.request<Restaurant[]>(url);
+
+  170    async getMerchantById(id: string): Promise<Restaurant> {
+  171:     return this.request<Restaurant>(`/merchants/${id}`);
+  172    }
+
+  174    async getMerchantMenu(restaurantId: string): Promise<MenuItem[]> {
+  175:     return this.request<MenuItem[]>(`/merchants/${restaurantId}/menu`);
+  176    }
+  177  
+  178:   async getBookableMerchants(): Promise<Restaurant[]> {
+  179:     return this.request<Restaurant[]>('/merchants?bookable=yes');
+  180    }
+
+  183    async getRestaurants(cuisine?: string): Promise<Restaurant[]> {
+  184:     return this.getMerchants(cuisine);
+  185    }
+
+  195    async getBookableRestaurants(): Promise<Restaurant[]> {
+  196:     return this.getBookableMerchants();
+  197    }
+
+  274      try {
+  275:       const merchants = await this.getMerchants();
+  276        if (__DEV__) {
+  277:         console.log('Merchants for cuisine extraction:', merchants.length);
+  278:         console.log('Sample merchant:', merchants[0]);
+  279        }
+  280        
+  281:       const cuisines = merchants
+  282          .map((r) => r.cuisine)
+
+  321  export const fetchCuisines = () => apiClient.getCuisines();
+  322: export const fetchRestaurants = (cuisine?: string) => apiClient.getMerchants(cuisine);
+  323  export const fetchRestaurantById = (id: string) => apiClient.getMerchantById(id);
+
+Grubsy-user-app/lib/restaurantApiClient.ts:
+  11    try {
+  12:     const response = await apiClient.get('/merchants');
+  13      return response.data;
+
+  21    try {
+  22:     const response = await apiClient.get(`/merchants/${id}`);
+  23      return response.data;
+
+  31    try {
+  32:     const response = await apiClient.get(`/merchants/${id}/menu`);
+  33      return response.data;
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/lib/commonjs/plugin/withStripe.js:
+  1: ⟪ 1040 characters skipped ⟫ment(merchantIdentifier,config.modResults);return config;});};function setApplePayEntitlement(merchantIdentifiers,entitlements){var _entitlements$key;var key='com.apple.developer.in-app-payments';var merchants=(_entitlements$key=entitlements[key])!=null?_entitlements$key:[];if(!Array.isArray(merchantIdentifiers)){merchantIdentifiers=[merchantIdentifiers];}for(var id of merchantIdentifiers){if(id&&!merchants.includes(id)){merchants.push(id);}}if(merchants.length){entitlements[key]=merchants;}return entitlements;}var withNoopSwiftFile=exports.withNoopSwiftFile=function withNoopSwiftFile(config){return _configPlugins.IOSConfig.XcodeProjectFile.withBuildSourceFile(config,{filePath:'noop-file.swift',contents:['//','// @generated','// A blank Swift file must be created for native modules with Swift files to work correctly.','//',''].join('\n')});};var withStripeAndroid=function withStripeAndroid(expoConfig,_ref2){var _ref2$enableGooglePay=_ref2.enableGooglePay,enableGooglePay=_ref2$enableGooglePay===void 0?false:_ref2$enableGooglePay;return(0,_configPlugins.withAndroidManifest)(expoConfig,function(config){config.modResults=setGooglePayMetaData(enableGooglePay,config.modResults);return config;});};function setGooglePayMetaData(enabled,modResults){var GOOGLE_PAY_META_NAME='com.google.android.gms.wallet.api.enabled';var mainApplication=getMainApplicationOrThrow(modResults);if(enabled){addMetaDataItemToMainApplication(mainApplication,GOOGLE_PAY_META_NAME,'true');}else{re
+  2  //# sourceMappingURL=withStripe.js.map
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/lib/commonjs/plugin/withStripe.js.map:
+  1: ⟪ 262 characters skipped ⟫opSwiftFile","withStripeAndroid","expoConfig","_ref","merchantIdentifier","withEntitlementsPlist","modResults","setApplePayEntitlement","merchantIdentifiers","entitlements","_entitlements$key","key","merchants","Array","isArray","id","includes","push","length","exports","IOSConfig","XcodeProjectFile","withBuildSourceFile","filePath","contents","join","_ref2","_ref2$enableGooglePay","enableGooglePay","withAndroidManifest","setGooglePayMetaData","enabled","GOOGLE_PAY_META_NAME","mainApplication","_default","default","createRunOncePlugin","name","version"],"sourceRoot":"../../../src","sources":["plugin/withStripe.ts"],"mappings":"yNAAA,IAAAA,cAAA,CAAAC,OAAA,yBASA,IAAAC,qBAAA,CAIIC,4BAAa,CAACC,QAAQ,CAHxBC,gCAAgC,CAAAH,qBAAA,CAAhCG,gCAAgC,CAChCC,yBAAyB,CAAAJ,qBAAA,CAAzBI,yBAAyB,CACzBC,qCAAqC,CAAAL,qBAAA,CAArCK,qCAAqC,CAGvC,GAAM,CAAAC,GAAG,CAAGP,OAAO,CAAC,0CAA0C,CAAC,CAW/D,GAAM,CAAAQ,UAA2C,CAAG,QAA9C,CAAAA,UAA2CA,CAAIC,MAAM,CAAEC,KAAK,CAAK,CACrED,MAAM,CAAGE,aAAa,CAACF,MAAM,CAAEC,KAAK,CAAC,CACrCD,MAAM,CAAGG,iBAAiB,CAACH,MAAM,CAAC,CAClCA,MAAM,CAAGI,iBAAiB,CAACJ,MAAM,CAAEC,KAAK,CAAC,CACzC,MAAO,CAAAD,MAAM,CACf,CAAC,CAED,GAAM,CAAAE,aAA8C,CAAG,QAAjD,CAAAA,aAA8CA,CAClDG,UAAU,CAAAC,IAAA,CAEP,IAD
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/lib/module/plugin/withStripe.js:
+  1: ⟪ 1040 characters skipped ⟫ment(merchantIdentifier,config.modResults);return config;});};function setApplePayEntitlement(merchantIdentifiers,entitlements){var _entitlements$key;var key='com.apple.developer.in-app-payments';var merchants=(_entitlements$key=entitlements[key])!=null?_entitlements$key:[];if(!Array.isArray(merchantIdentifiers)){merchantIdentifiers=[merchantIdentifiers];}for(var id of merchantIdentifiers){if(id&&!merchants.includes(id)){merchants.push(id);}}if(merchants.length){entitlements[key]=merchants;}return entitlements;}var withNoopSwiftFile=exports.withNoopSwiftFile=function withNoopSwiftFile(config){return _configPlugins.IOSConfig.XcodeProjectFile.withBuildSourceFile(config,{filePath:'noop-file.swift',contents:['//','// @generated','// A blank Swift file must be created for native modules with Swift files to work correctly.','//',''].join('\n')});};var withStripeAndroid=function withStripeAndroid(expoConfig,_ref2){var _ref2$enableGooglePay=_ref2.enableGooglePay,enableGooglePay=_ref2$enableGooglePay===void 0?false:_ref2$enableGooglePay;return(0,_configPlugins.withAndroidManifest)(expoConfig,function(config){config.modResults=setGooglePayMetaData(enableGooglePay,config.modResults);return config;});};function setGooglePayMetaData(enabled,modResults){var GOOGLE_PAY_META_NAME='com.google.android.gms.wallet.api.enabled';var mainApplication=getMainApplicationOrThrow(modResults);if(enabled){addMetaDataItemToMainApplication(mainApplication,GOOGLE_PAY_META_NAME,'true');}else{re
+  2  //# sourceMappingURL=withStripe.js.map
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/lib/module/plugin/withStripe.js.map:
+  1: ⟪ 262 characters skipped ⟫opSwiftFile","withStripeAndroid","expoConfig","_ref","merchantIdentifier","withEntitlementsPlist","modResults","setApplePayEntitlement","merchantIdentifiers","entitlements","_entitlements$key","key","merchants","Array","isArray","id","includes","push","length","exports","IOSConfig","XcodeProjectFile","withBuildSourceFile","filePath","contents","join","_ref2","_ref2$enableGooglePay","enableGooglePay","withAndroidManifest","setGooglePayMetaData","enabled","GOOGLE_PAY_META_NAME","mainApplication","_default","default","createRunOncePlugin","name","version"],"sourceRoot":"../../../src","sources":["plugin/withStripe.ts"],"mappings":"yNAAA,IAAAA,cAAA,CAAAC,OAAA,yBASA,IAAAC,qBAAA,CAIIC,4BAAa,CAACC,QAAQ,CAHxBC,gCAAgC,CAAAH,qBAAA,CAAhCG,gCAAgC,CAChCC,yBAAyB,CAAAJ,qBAAA,CAAzBI,yBAAyB,CACzBC,qCAAqC,CAAAL,qBAAA,CAArCK,qCAAqC,CAGvC,GAAM,CAAAC,GAAG,CAAGP,OAAO,CAAC,0CAA0C,CAAC,CAW/D,GAAM,CAAAQ,UAA2C,CAAG,QAA9C,CAAAA,UAA2CA,CAAIC,MAAM,CAAEC,KAAK,CAAK,CACrED,MAAM,CAAGE,aAAa,CAACF,MAAM,CAAEC,KAAK,CAAC,CACrCD,MAAM,CAAGG,iBAAiB,CAACH,MAAM,CAAC,CAClCA,MAAM,CAAGI,iBAAiB,CAACJ,MAAM,CAAEC,KAAK,CAAC,CACzC,MAAO,CAAAD,MAAM,CACf,CAAC,CAED,GAAM,CAAAE,aAA8C,CAAG,QAAjD,CAAAA,aAA8CA,CAClDG,UAAU,CAAAC,IAAA,CAEP,IAD
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/lib/typescript/src/types/PlatformPay.d.ts:
+  105  };
+  106: /** Use this to indicate payments for multiple merchants. */
+  107  export type MultiMerchantRequest = {
+  108      type: PaymentRequestType.MultiMerchant;
+  109:     merchants: Array<{
+  110          /** The Apple Pay merchant identifier. */
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/src/plugin/withStripe.ts:
+  60  
+  61:   const merchants: string[] = entitlements[key] ?? [];
+  62  
+
+  67    for (const id of merchantIdentifiers) {
+  68:     if (id && !merchants.includes(id)) {
+  69:       merchants.push(id);
+  70      }
+
+  72  
+  73:   if (merchants.length) {
+  74:     entitlements[key] = merchants;
+  75    }
+
+Grubsy-user-app/Not syncing/node_modules2/@stripe/stripe-react-native/src/types/PlatformPay.ts:
+  123  
+  124: /** Use this to indicate payments for multiple merchants. */
+  125  export type MultiMerchantRequest = {
+  126    type: PaymentRequestType.MultiMerchant;
+  127:   merchants: Array<{
+  128      /** The Apple Pay merchant identifier. */

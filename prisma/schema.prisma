@@ -1,0 +1,647 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Order_Photos {
+  id              String   @id @default(cuid())
+  order_id        String
+  driver_id       String
+  photo_type      String
+  photo_url       String?  @db.Text
+  photo_data      String?  @db.LongText
+  timestamp       DateTime @default(now())
+  restaurant_name String?  @db.VarChar(200)
+  customer_name   String?  @db.VarChar(200)
+  created_at      DateTime @default(now())
+
+  @@index([order_id])
+  @@index([driver_id])
+  @@map("order_photos")
+}
+
+model Driver_Activities {
+  id         String   @id @default(cuid())
+  driver_id  String
+  action     String   @db.VarChar(100)
+  timestamp  DateTime @default(now())
+  latitude   Decimal? @db.Decimal(9, 6)
+  longitude  Decimal? @db.Decimal(9, 6)
+  order_id   String?
+  metadata   String?  @db.Text
+  created_at DateTime @default(now())
+
+  @@index([driver_id])
+  @@index([order_id])
+  @@index([timestamp])
+  @@map("driver_activities")
+}
+
+model Order_Activities {
+  id         String   @id @default(cuid())
+  order_id   String
+  driver_id  String?
+  action     String   @db.VarChar(100)
+  timestamp  DateTime @default(now())
+  status     String?  @db.VarChar(50)
+  latitude   Decimal? @db.Decimal(9, 6)
+  longitude  Decimal? @db.Decimal(9, 6)
+  metadata   String?  @db.Text
+  created_at DateTime @default(now())
+
+  @@index([order_id])
+  @@index([driver_id])
+  @@index([timestamp])
+  @@map("order_activities")
+}
+
+model Driver_Payouts {
+  id           String    @id @default(cuid())
+  driver_id    String
+  amount       Decimal   @db.Decimal(10, 2)
+  fee          Decimal   @default(0.00) @db.Decimal(10, 2)
+  net_amount   Decimal   @db.Decimal(10, 2)
+  method       String    @db.VarChar(20)
+  status       String    @default("pending") @db.VarChar(20)
+  requested_at DateTime  @default(now())
+  processed_at DateTime?
+  reference    String?   @db.VarChar(100)
+  notes        String?   @db.Text
+
+  @@index([driver_id])
+  @@index([status])
+  @@index([requested_at])
+  @@map("driver_payouts")
+}
+
+model Merchant_Payouts {
+  id                 String                  @id @default(cuid())
+  partner_id         String                  @db.VarChar(64)
+  amount             Decimal                 @db.Decimal(10, 2)
+  status             merchant_payouts_status @default(pending)
+  method             String?                 @db.VarChar(32)
+  external_reference String?                 @db.VarChar(128)
+  requested_at       DateTime                @db.DateTime(0)
+  processed_at       DateTime?               @db.DateTime(0)
+  notes              String?                 @db.Text
+
+  @@index([partner_id, requested_at], map: "idx_partner_created")
+  @@map("merchant_payouts")
+}
+
+/// Chat messages between driver ↔ customer ↔ support, used by the Driver App
+model Chat_Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  orderId        String?
+  fromRole       String
+  toRole         String
+  driverId       String?
+  userId         String?
+  supportUserId  String?
+  text           String    @db.Text
+  timestamp      DateTime  @default(now())
+  metadata       String?   @db.LongText
+  readAt         DateTime?
+
+  @@index([conversationId], map: "idx_chat_messages_conversationId")
+  @@index([driverId], map: "idx_chat_messages_driverId")
+  @@index([orderId], map: "idx_chat_messages_orderId")
+  @@map("chat_messages")
+}
+
+model Merchant_Password_Resets {
+  id         String    @id @default(cuid())
+  email      String    @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  expires_at DateTime  @db.DateTime(0)
+  used       Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+
+  @@index([email, token], map: "idx_email_token")
+  @@index([expires_at], map: "idx_expires_at")
+  @@map("merchant_password_resets")
+}
+
+model AdminUser {
+  id            String           @id @db.VarChar(36)
+  email         String           @unique(map: "email") @db.VarChar(255)
+  password_hash String           @db.VarChar(255)
+  full_name     String?          @db.VarChar(255)
+  role          Admin_Users_Role @default(support)
+  is_active     Boolean?         @default(true)
+  requires_otp  Boolean?         @default(false)
+  otp_secret    String?          @db.VarChar(255)
+  created_at    DateTime?        @default(now()) @db.DateTime(0)
+  updated_at    DateTime?        @default(now()) @db.DateTime(0)
+  last_login_at DateTime?        @db.DateTime(0)
+
+  @@map("admin_users")
+}
+
+model basket_table {
+  id                String  @id
+  Basket_ID         String  @unique(map: "Basket_Table_Basket ID_key") @map("Basket ID")
+  User_Grubsy_ID    String  @map("User Grubsy ID")
+  Grubsy_Partner_ID String
+  Menu_Item_ID      String
+  Quantity          String?
+  Price             String?
+  Added_At          String?
+  Status            String?
+}
+
+model bookings {
+  id                String  @id
+  Merchant_Name     String?
+  User_Email        String
+  Date              String?
+  Time              String?
+  Guests            String?
+  Name              String?
+  Phone             String?
+  Special_Requests  String?
+  Grubsy_User_Id    String?
+  Grubsy_Partner_ID String?
+}
+
+model combo_options {
+  id                             String  @id
+  Merchant_Name                  String?
+  Grubsy_Partner_ID              String?
+  Combo_Name                     String?
+  Option_Name                    String?
+  Option_Order                   String?
+  Option_Items__comma_separated_ String? @map("Option_Items (comma separated)")
+  Combo_Option_ID                String  @unique(map: "Combo_Options_Combo_Option_ID_key")
+  Combo_ID                       String?
+  Image                          String?
+}
+
+model combos {
+  id                           String  @id
+  Combo_ID                     String  @unique(map: "Combos_Combo_ID_key")
+  Merchant_Name                String?
+  Combo_Name                   String?
+  Price                        String?
+  Description                  String?
+  Available_Times              String?
+  Status                       String?
+  Created_at_                  String? @map("Created_at:")
+  Grubsy_Partner_ID            String?
+  Image                        String?
+  Free_Sauces                  String?
+  Free_Sides                   String?
+  Special_Instructions_Allowed Boolean @default(true)
+}
+
+model crm_back_office {
+  id                String  @id
+  CRM_ID            String  @unique(map: "CRM/Back Office_CRM_ID_key")
+  User_Grubsy_ID    String?
+  Order_Number      String?
+  Grubsy_Partner_ID String?
+  Status            String?
+  Last_Synced       String?
+  Notes             String?
+
+  @@map("crm/back office")
+}
+
+model delivery_zones {
+  id                           String  @id
+  Zone_ID                      String  @unique(map: "Delivery Zones_Zone_ID_key")
+  Zone_Name                    String?
+  Post_Codes__Comma_Separated_ String? @map("Post_Codes (Comma Separated)")
+  Status                       String?
+  Driver_Fee_Normal_hrs        String? @map("Driver_Fee:Normal_hrs")
+  Driver_Fee_Peak_Hours        String? @map("Driver_Fee:Peak_Hours")
+  Peak_Hours__4pm_7pm__Active_ String? @map("Peak Hours (4pm-7pm) Active:")
+  Delivery_Charge              String?
+
+  @@map("delivery zones")
+}
+
+model devicetoken {
+  id        String   @id
+  userId    String?
+  driverId  String?
+  token     String   @unique(map: "DeviceToken_token_key")
+  platform  String
+  deviceId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(dbgenerated("('0000-00-00 00:00:00.000')"))
+
+  @@index([driverId], map: "DeviceToken_driverId_idx")
+  @@index([userId], map: "DeviceToken_userId_idx")
+}
+
+model documents {
+  id            String  @id
+  DocumentID    String  @unique(map: "Documents_DocumentID_key")
+  Code          String?
+  Description   String?
+  Document_Name String?
+  File_URL      String?
+  SKU           String?
+  Image_URL     String?
+  Comments      String?
+}
+
+model driver___faq_s {
+  id       String @id
+  Question String @unique(map: "Driver : FAQ's_Question_key")
+  Answer   String @db.Text
+
+  @@map("driver : faq's")
+}
+
+model drivers {
+  Driver_ID               String                     @id @db.VarChar(20)
+  first_name              String                     @db.VarChar(100)
+  last_name               String                     @db.VarChar(100)
+  profile_photo_url       String?                    @db.VarChar(512)
+  email                   String?                    @db.VarChar(255)
+  driver_pw               String?                    @db.VarChar(255)
+  phone                   String                     @db.VarChar(32)
+  phone_verified_at       DateTime?                  @db.DateTime(0)
+  email_verified_at       DateTime?                  @db.DateTime(0)
+  status                  drivers_status             @default(pending)
+  date_joined             DateTime                   @default(now()) @db.DateTime(0)
+  last_login              DateTime?                  @db.DateTime(0)
+  created_at              DateTime                   @default(now()) @db.DateTime(0)
+  updated_at              DateTime                   @default(now()) @db.DateTime(0)
+  vehicle_type            drivers_vehicle_type
+  vehicle_reg             String?                    @db.VarChar(64)
+  driving_licence         String?                    @db.VarChar(128)
+  licence_expiry          DateTime?                  @db.Date
+  Registered_address      String                     @db.VarChar(200)
+  address_line1           String                     @db.VarChar(200)
+  address_line2           String?                    @db.VarChar(200)
+  city                    String                     @db.VarChar(100)
+  state_region            String?                    @db.VarChar(100)
+  postcode                String                     @db.VarChar(32)
+  country                 String                     @db.Char(2)
+  insurance_provider      String?                    @db.VarChar(120)
+  insurance_policy_number String?                    @db.VarChar(80)
+  insurance_coverage_type String?                    @db.VarChar(80)
+  insurance_expiry        DateTime?                  @db.Date
+  insurance_verified      drivers_insurance_verified @default(unverified)
+  insurance_document_url  String?                    @db.VarChar(512)
+  UTR_Number              String?                    @db.VarChar(10)
+  NI_Number               String?                    @db.VarChar(13)
+  availability            Boolean                    @default(false)
+  current_location_lat    Decimal?                   @db.Decimal(9, 6)
+  current_location_lng    Decimal?                   @db.Decimal(9, 6)
+  location_updated_at     DateTime?                  @db.DateTime(0)
+  completed_orders        Int                        @default(0)
+  cancellations_count     Int                        @default(0)
+  emergencies             Int                        @default(0)
+  earnings_total          Decimal                    @default(0.00) @db.Decimal(12, 2)
+  tips_total              Decimal                    @default(0.00) @db.Decimal(12, 2)
+  current_balance         Decimal                    @default(0.00) @db.Decimal(12, 2)
+  last_payout_at          DateTime?                  @db.DateTime(0)
+  emergency_contact_name  String?                    @db.VarChar(100)
+  emergency_contact_phone String?                    @db.VarChar(32)
+  base_city               String?                    @db.VarChar(100)
+  work_schedule           String?                    @db.Text
+  max_distance            Decimal                    @default(25.00) @db.Decimal(5, 2)
+  otp                     String?                    @db.VarChar(10)
+  push_notification       Boolean                    @default(true)
+  sound_notification      Boolean                    @default(true)
+  vibrate_notification    Boolean                    @default(true)
+  rating                  Decimal                    @default(0.00) @db.Decimal(3, 2)
+
+  orders orders[] @relation("orders_driver_fk")
+}
+
+model faq_s___establishment {
+  id       String @id
+  Question String @unique(map: "FAQ's : Establishment_Question_key")
+  Answer   String @db.Text
+
+  @@map("faq's : establishment")
+}
+
+model menu_items {
+  id                           String  @id
+  Menu_Item_ID                 String  @unique(map: "Menu_Items_Menu_Item_ID_key")
+  merchant_name                String?
+  Grubsy_Partner_ID            String?
+  Food_Category                String?
+  Item                         String
+  Regular                      String?
+  Medium                       String?
+  Large                        String?
+  Platter                      String?
+  Image                        String?
+  Description                  String? @db.Text
+  Notes                        String? @db.Text
+  SKU                          String?
+  Created_At                   String?
+  Updated_At                   String?
+  Available                    String?
+  LastToggledAt                String?
+  Promotion                    String? @db.Text
+  Free_Sauces                  String?
+  Free_Sides                   String?
+  Special_Instructions_Allowed Boolean @default(true)
+
+  @@map("Menu_Items")
+}
+
+model merchants {
+  id                         String   @id
+  Grubsy_Partner_ID          String   @unique(map: "Merchants_Grubsy_Partner_ID_key")
+  Merchants_Name             String?
+  Merchants_Phone_Number     String?
+  Description                String?  @db.Text
+  Cuisine                    String?
+  Address                    String?
+  Area                       String?
+  PostCode                   String?
+  Hygiene_Rating             String?
+  Opening_Times              String?
+  Halal_Friendly_            String?  @map("حلال Halal Friendly?")
+  Photo                      String?
+  Booking_Available          String?
+  Relation                   String?
+  Active                     String?
+  Created_at                 String?
+  Updated_At                 String?
+  Owners_Name                String?
+  Owners_Number              String?
+  Merchant_Enrolement_Status String?
+  Merchant_Fee_Per_Order     String?
+  Merchants_Email            String?  @unique(map: "Merchants_Merchants_Email_key")
+  Merchants_Password         String?
+  coordinate_lat             Decimal? @db.Decimal(9, 6)
+  coordinate_lon             Decimal? @db.Decimal(9, 6)
+  Delivery_Radius            Decimal? @db.Decimal(5, 2)
+  Average_Preparation_Time   Int?
+
+  orders orders[] @relation("orders_merchant_fk")
+}
+
+model otp_Logs {
+  id               String   @id @default(cuid())
+  phone_number     String
+  otp_code         String
+  status           String   @default("SENT")
+  order_id         String?  
+  provider         String?  
+  provider_response String? 
+  Created_At       DateTime @default(now())
+
+  @@map("otp_logs")
+  @@index([phone_number])
+  @@index([status])
+  @@index([order_id])
+  @@index([Created_At])
+}
+
+model audit_Logs {
+  id          String   @id @default(cuid())
+  action      String
+  entity_type String
+  entity_id   String   @default("")      // optional, can be empty
+  user_id     String   @default("system") // optional, defaults to system
+  details     Json?                     // optional, stores extra info
+  ip_address  String?                    // optional, IP of request
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs") // matches actual table name in DB
+}
+model order_lines {
+  id            String  @id
+  Order_Line_ID String  @unique(map: "Order_Lines_Order_Line_ID_key")
+  Order_ID      String?
+  Menu_Item_ID  String?
+  Quantity      String?
+  Price         String?
+  Subtotal      String?
+}
+
+model order_messages {
+  id           String  @id
+  Message_ID   String  @unique(map: "Order_Messages_Message_ID_key")
+  Order_Number String?
+  User_Email   String?
+  Message      String?
+  Time_Stamp   String?
+  Status       String?
+  User_ID      String?
+}
+
+model orders {
+  id                      String         @id
+  Order_ID                String         @unique(map: "Orders_Order_ID_key")
+  Ordered_Items           String?
+  Grubsy_User_ID          String?
+  Users_Name              String?
+  Merchants_Name          String?
+  Driver_Name             String?
+  Grubsy_Partner_ID       String?
+  Order_Date              String?
+  status                  orders_status? @default(PENDING)
+  Basket_SubTotal         String?
+  Service_Fee             String?
+  Delivery_Fee            String?
+  tips                    String?
+  Order_Grand_Total       String?
+  Grubsy_Profit           String?
+  Delivery_Address        String?
+  Delivery_Instructions   String?
+  Users_Email             String?
+  Driver_ID               String?
+  sku                     String?
+  Created_At              String?
+  Delivered_At            String?
+  Payment_Link            String?
+  Payment_Status          String?
+  Stripe_Session_ID       String?
+  Users_Phone_number      String?
+  coordinates             String?
+  Merchant_Accepted_At_   String?        @map("Merchant_Accepted_At:")
+  Driver_PickUp_At_       String?        @map("Driver_PickUp_At:")
+  Merchants_Order_Images  String?
+  Drivers_Order_Images    String?
+  USer_Code_Given         String?
+  Accepted_At             DateTime?
+  At_Restaurant_At        DateTime?
+  Cancellation_Reason     String?
+  Cancelled_At            DateTime?
+  Delivery_Code           String?
+  Delivery_Postcode       String?
+  Driver_Allocated_At     DateTime?
+  Driver_Allocating_At    DateTime?
+  Emergency_Reason        String?
+  Emergency_Reported_At   DateTime?
+  Emergency_Type          String?
+  Original_Driver_Penalty String?
+  Out_For_Delivery_At     DateTime?
+  Picked_Up_At            DateTime?
+  Pickup_Code             String?
+  Ready_At                DateTime?
+  Reallocated_At          DateTime?
+  Reallocated_Driver_ID   String?
+  coordinate_lat          Decimal?       @db.Decimal(9, 6)
+  coordinate_lon          Decimal?       @db.Decimal(9, 6)
+
+  merchants merchants? @relation("orders_merchant_fk", fields: [Grubsy_Partner_ID], references: [Grubsy_Partner_ID])
+  users     users?     @relation("orders_user_fk", fields: [Grubsy_User_ID], references: [Grubsy_User_ID])
+  drivers   drivers?   @relation("orders_driver_fk", fields: [Driver_ID], references: [Driver_ID])
+
+  @@index([Driver_ID, status], map: "idx_orders_driver_status")
+  @@index([Grubsy_Partner_ID, status], map: "idx_orders_partner_status")
+  @@index([Grubsy_User_ID], map: "idx_orders_user")
+}
+
+model user___faq_s {
+  id       String  @id
+  Question String  @unique(map: "User : FAQ's_Question_key")
+  SKU      String?
+  Answer   String  @db.Text
+
+  @@map("user : faq's")
+}
+
+model user_session {
+  id                 String  @id
+  Session_ID         String  @unique(map: "User Session_Session_ID_key")
+  Grubsy_User_ID     String?
+  Manual_Location    String?
+  Search_Location    String?
+  Basket_Subtotal    String?
+  Fee                String?
+  Order_Grand_Total  String?
+  Cuisines_of_Grubsy String?
+  Created_At         String?
+
+  @@map("user session")
+}
+
+model user_preferences {
+  id                   String   @id
+  user_id              String   @unique(map: "User_Preferences_user_id_key")
+  order_updates        Boolean  @default(true)
+  promotions           Boolean  @default(false)
+  new_restaurants      Boolean  @default(true)
+  delivery_alerts      Boolean  @default(true)
+  location_services    Boolean  @default(true)
+  auto_detect_location Boolean  @default(true)
+  save_payment_info    Boolean  @default(false)
+  email_receipts       Boolean  @default(true)
+  vegetarian           Boolean  @default(false)
+  vegan                Boolean  @default(false)
+  halal                Boolean  @default(false)
+  gluten_free          Boolean  @default(false)
+  dairy_free           Boolean  @default(false)
+  created_at           DateTime @default(now())
+  updated_at           DateTime
+  users                users    @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "User_Preferences_user_id_fkey")
+}
+
+model users {
+  id                        String            @id
+  Users_Full_Name           String?
+  Users_Email               String            @unique(map: "Users_Users_Email_key")
+  Users_Password            String?
+  Grubsy_User_ID            String            @unique(map: "Users_Grubsy_User_ID_key")
+  Is_New_User_              String?           @map("Is_New_User?")
+  Users_Registered_Address  String?
+  Users_Registered_PostCode String?
+  Users_Phone_Number        String?
+  Date_Of_Birth             String?
+  Status                    String?
+  Total_Orders              Int?     @default(0)
+  Total_Spent               Int?     @default(0)
+  Device_Type               String?  @db.Text
+  App_Version               String?  @db.Text
+  Referral_Code             String?  @db.Text
+  Referred_By               String?  @db.Text
+  Email_Verified            String?  @db.Text
+  Phone_Verified            String?  @db.Text
+  Acc_Created_At            String?
+  Last_Login                String?
+  Updated_At           DateTime
+  user_preferences          user_preferences?
+
+  orders orders[] @relation("orders_user_fk")
+}
+
+enum merchant_payouts_status {
+  pending
+  processing
+  paid
+  failed
+}
+
+enum Admin_Users_Role {
+  super_admin
+  operations
+  support
+  finance
+}
+
+enum orders_status {
+  PENDING
+  ACCEPTED
+  READY_FOR_DRIVER
+  ALLOCATING_DRIVER
+  ALLOCATED_DRIVER
+  AT_RESTAURANT
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum drivers_status {
+  pending
+  active
+  suspended
+  deactivated
+}
+
+enum drivers_vehicle_type {
+  bicycle
+  scooter
+  motorbike
+  car
+  van
+}
+
+enum drivers_insurance_verified {
+  unverified
+  pending
+  verified
+  rejected
+}
+
+model coupons {
+  id                       String   @id @default(cuid())
+  code                     String   @unique
+  description              String?  @db.Text
+  discount_type            String   // 'percentage' or 'fixed'
+  discount_value           Decimal  @db.Decimal(10, 2)
+  min_order_amount         Decimal? @db.Decimal(10, 2)
+  max_discount_amount      Decimal? @db.Decimal(10, 2)
+  usage_limit              Int?
+  usage_limit_per_user     Int?
+  start_date               DateTime @default(now())
+  end_date                 DateTime?
+  applicable_merchants     String?  @db.Text // JSON array of merchant IDs
+  applicable_categories    String?  @db.Text // JSON array of categories
+  first_order_only         Boolean  @default(false)
+  active                   Boolean  @default(true)
+  used_count               Int      @default(0)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@map("coupons")
+}
